@@ -23,6 +23,8 @@ function getTodayDateInputValue() {
 }
 
 function isAuthenticated() {
+  // TODO: Replace this temporary localStorage check with the team's auth provider/context
+  // once the final JWT authentication flow is confirmed.
   return Boolean(
     localStorage.getItem("token") ||
       localStorage.getItem("authToken") ||
