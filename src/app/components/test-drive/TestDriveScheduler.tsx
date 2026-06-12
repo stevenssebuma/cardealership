@@ -18,6 +18,7 @@ type TestDriveSchedulerProps = {
 };
 
 const availableTimes = ["09:00", "10:00", "11:00", "12:00", "14:00", "15:00", "16:00"];
+const LOGIN_REDIRECT_PATH = "/login?redirect=/test-drive";
 
 function getTodayDateInputValue() {
   return new Date().toISOString().split("T")[0];
@@ -59,8 +60,10 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
     if (!isAuthenticated()) {
       setAuthMessage("Please sign in first so we can reserve your test drive securely.");
 
+      // TODO: Replace this URL-only redirect with real navigation once the login route exists.
+      // Using history.pushState avoids a confusing full-page reload while the app has no /login route.
       setTimeout(() => {
-        window.location.href = "/login?redirect=/test-drive";
+        window.history.pushState(null, "", LOGIN_REDIRECT_PATH);
       }, 1200);
 
       return;
