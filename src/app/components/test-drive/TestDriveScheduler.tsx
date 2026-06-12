@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Calendar, CheckCircle2, Clock, LogIn } from "lucide-react";
 import { Button } from "../ui/button";
+import { submitTestDriveBookingDraft, type TestDriveBookingPayload } from "../../lib/api";
 import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -85,7 +86,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
       return;
     }
 
-    const bookingPayload = {
+    const bookingPayload: TestDriveBookingPayload = {
       vehicleId: selectedVehicleId,
       vehicleName: selectedVehicle?.name,
       date,
@@ -94,7 +95,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
       notes,
     };
 
-    console.log("Test drive booking payload:", bookingPayload);
+    submitTestDriveBookingDraft(bookingPayload);
 
     setSuccess(true);
     setNotes("");
