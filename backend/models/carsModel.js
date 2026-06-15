@@ -4,16 +4,7 @@ import db from "../config/db.js";
 export const getAllCars = async () => {
   const carsQuery = `
     SELECT 
-      c.*,
-      cs.power,
-      cs.engine,
-      cs.drive,
-      (
-        SELECT image_url 
-        FROM car_images ci 
-        WHERE ci.car_id = c.id AND ci.is_primary = true
-        LIMIT 1
-      ) as image
+      c.*
     FROM cars c
     ORDER BY c.created_at DESC;
   `;
