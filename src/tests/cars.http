@@ -1,10 +1,10 @@
 ### Get latest cars
-GET http://localhost:3000/api/cars
+GET http://localhost:5500/api/cars
 
 ###
 
 ### Filter by make
-GET http://localhost:3000/api/cars?make=Toyota
+GET http://localhost:5500/api/cars?make=Toyota
 
 ###
 

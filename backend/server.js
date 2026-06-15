@@ -4,8 +4,11 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Swagger setup (we will connect later)
-import setupSwagger from "./docs/swagger.js";
+import carsRoutes from "./routes/carsRoutes.js";
+
+
+// // Swagger setup (we will connect later)
+// import setupSwagger from "./docs/swagger.js";
 
 dotenv.config();
 
@@ -18,7 +21,7 @@ const __dirname = path.dirname(__filename);
 
 // -------------------- CORS CONFIG --------------------
 const allowedOrigins = [
-  "http://localhost:5173", // frontend (Vite/React)
+  "http://localhost:5173",
 ];
 
 app.use(
@@ -37,8 +40,8 @@ app.use(
 // -------------------- MIDDLEWARE --------------------
 app.use(express.json());
 
-// -------------------- SWAGGER --------------------
-setupSwagger(app);
+// // -------------------- SWAGGER --------------------
+// setupSwagger(app);
 
 // -------------------- TEST ROUTE --------------------
 app.get("/", (req, res) => {
@@ -46,7 +49,8 @@ app.get("/", (req, res) => {
 });
 
 // -------------------- ROUTES --------------------
-// We will add these step by step as you build them
+
+app.use("/api/cars", carsRoutes);
 
 // -------------------- SERVER START --------------------
 const PORT = process.env.PORT || 5500;
