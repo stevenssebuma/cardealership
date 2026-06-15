@@ -4,8 +4,19 @@ import db from "../config/db.js";
 export const getAllCars = async () => {
   const carsQuery = `
     SELECT 
-      c.*
+      c.*,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', ci.id,
+            'image_url', ci.image_url
+          )
+        ) FILTER (WHERE ci.id IS NOT NULL),
+        '[]'
+      ) AS images
     FROM cars c
+    LEFT JOIN car_images ci ON ci.car_id = c.id
+    GROUP BY c.id
     ORDER BY c.created_at DESC;
   `;
 
