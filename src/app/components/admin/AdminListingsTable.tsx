@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "../ui/table";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import { EditVehicleModal } from "./EditVehicleModal";
 
 type AdminVehicle = {
   id: number;
@@ -39,6 +40,7 @@ function formatUGX(amount: number) {
 export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
   const [listings, setListings] = useState(vehicles);
   const [vehicleToDelete, setVehicleToDelete] = useState<AdminVehicle | null>(null);
+  const [vehicleToEdit, setVehicleToEdit] = useState<AdminVehicle | null>(null);
 
   useEffect(() => {
     setListings(vehicles);
@@ -54,6 +56,24 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
     );
 
     setVehicleToDelete(null);
+  }
+
+  function handleSaveEdit(updatedVehicle: AdminVehicle) {
+    // TODO: Replace this UI-only update with protected PUT /api/cars/:id
+    // once the backend inventory endpoint and admin JWT middleware are confirmed.
+    setListings((currentListings) =>
+      currentListings.map((vehicle) =>
+        vehicle.id === updatedVehicle.id
+          ? {
+              ...vehicle,
+              price: updatedVehicle.price,
+              condition: updatedVehicle.condition,
+            }
+          : vehicle
+      )
+    );
+
+    setVehicleToEdit(null);
   }
 
   if (!listings.length) {
@@ -121,9 +141,7 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() =>
-                          console.log("Edit vehicle requested:", vehicle.id)
-                        }
+                        onClick={() => setVehicleToEdit(vehicle)}
                       >
                         Edit
                       </Button>
@@ -144,6 +162,15 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
           </Table>
         </div>
       </div>
+
+      <EditVehicleModal
+        vehicle={vehicleToEdit}
+        open={Boolean(vehicleToEdit)}
+        onOpenChange={(open) => {
+          if (!open) setVehicleToEdit(null);
+        }}
+        onSave={handleSaveEdit}
+      />
 
       <DeleteConfirmModal
         vehicle={vehicleToDelete}
