@@ -1,5 +1,26 @@
 import { isAdminUser, isAuthenticated } from "../../lib/auth";
 import { Button } from "../ui/button";
+import { AdminListingsTable } from "./AdminListingsTable";
+
+type AdminVehicle = {
+  id: number;
+  name: string;
+  brand: string;
+  type: string;
+  year: number;
+  price: number;
+  condition: string;
+  image: string;
+  specs: {
+    power: string;
+    engine: string;
+    drive: string;
+  };
+};
+
+type AdminDashboardProps = {
+  vehicles: AdminVehicle[];
+};
 
 /**
  * AdminDashboard
@@ -10,14 +31,14 @@ import { Button } from "../ui/button";
  * Current behavior:
  * - Blocks unauthenticated users.
  * - Blocks authenticated non-admin users.
- * - Shows dashboard placeholder only when admin access is detected.
+ * - Shows inventory controls only when admin access is detected.
  *
  * TODO:
  * Replace temporary localStorage-based auth checks with the team's final
  * JWT/auth provider once the backend role payload is confirmed.
  */
 
-export function AdminDashboard() {
+export function AdminDashboard({ vehicles }: AdminDashboardProps) {
   const authenticated = isAuthenticated();
   const admin = isAdminUser();
 
@@ -91,10 +112,12 @@ export function AdminDashboard() {
           </h3>
 
           <p className="text-muted-foreground text-lg">
-            Admin access confirmed. Inventory table and edit/delete controls
-            will be added in the next implementation phase.
+            Admin access confirmed. Manage current listings, update pricing, or
+            prepare sold vehicles for removal.
           </p>
         </div>
+
+        <AdminListingsTable vehicles={vehicles} />
       </div>
     </section>
   );

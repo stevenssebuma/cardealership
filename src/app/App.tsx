@@ -35,10 +35,6 @@ export default function App() {
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  if (window.location.pathname === "/admin") {
-    return <AdminDashboard />;
-  }
-
   const vehicles = [
     {
       id: 1,
@@ -137,6 +133,10 @@ export default function App() {
       condition: "New",
     },
   ];
+
+  if (window.location.pathname === "/admin") {
+    return <AdminDashboard vehicles={vehicles} />;
+  }
 
   const filteredVehicles = vehicles.filter(vehicle => {
     const matchesBrand = searchBrand ? vehicle.brand.toLowerCase().includes(searchBrand.toLowerCase()) : true;
