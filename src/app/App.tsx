@@ -7,6 +7,7 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Card, CardContent } from "./components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { AdminDashboard } from "./components/admin/AdminDashboard";
 
 function formatUGX(amount: number) {
   if (amount >= 1_000_000_000) return `UGX ${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -33,6 +34,10 @@ export default function App() {
   }, []);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (window.location.pathname === "/admin") {
+    return <AdminDashboard />;
+  }
 
   const vehicles = [
     {

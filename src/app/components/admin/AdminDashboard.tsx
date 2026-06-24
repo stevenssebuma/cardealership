@@ -1,20 +1,83 @@
+import { isAdminUser, isAuthenticated } from "../../lib/auth";
+import { Button } from "../ui/button";
+
 /**
  * AdminDashboard
  *
  * Purpose:
  * Private admin dashboard entry component for dealership managers.
  *
- * Planned responsibilities:
- * - Check admin access before showing inventory controls.
- * - Render the admin listings table.
- * - Keep dashboard UI separate from the customer marketplace flow.
+ * Current behavior:
+ * - Blocks unauthenticated users.
+ * - Blocks authenticated non-admin users.
+ * - Shows dashboard placeholder only when admin access is detected.
  *
- * Implementation phase:
- * Phase 10 will add the admin/route guard behavior.
- * Phase 11 will add the inventory listings table.
+ * TODO:
+ * Replace temporary localStorage-based auth checks with the team's final
+ * JWT/auth provider once the backend role payload is confirmed.
  */
 
 export function AdminDashboard() {
+  const authenticated = isAuthenticated();
+  const admin = isAdminUser();
+
+  if (!authenticated) {
+    return (
+      <section className="min-h-screen py-24 px-6 lg:px-8 bg-background flex items-center">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-primary text-sm font-bold tracking-[0.3em] mb-4 uppercase">
+            Admin Access Required
+          </p>
+
+          <h3 className="text-4xl md:text-6xl font-bold mb-4">
+            PLEASE SIGN IN
+          </h3>
+
+          <p className="text-muted-foreground text-lg mb-8">
+            You need to sign in with an administrator account before accessing
+            the inventory control panel.
+          </p>
+
+          <Button
+            className="bg-primary text-white hover:bg-primary/90"
+            onClick={() => window.history.pushState(null, "", "/login?redirect=/admin")}
+          >
+            Go To Login
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
+  if (!admin) {
+    return (
+      <section className="min-h-screen py-24 px-6 lg:px-8 bg-background flex items-center">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-primary text-sm font-bold tracking-[0.3em] mb-4 uppercase">
+            Unauthorized
+          </p>
+
+          <h3 className="text-4xl md:text-6xl font-bold mb-4">
+            ADMIN PERMISSION NEEDED
+          </h3>
+
+          <p className="text-muted-foreground text-lg mb-8">
+            Your account is signed in, but it does not currently have permission
+            to access dealership management tools.
+          </p>
+
+          <Button
+            variant="outline"
+            className="border-primary text-primary hover:bg-primary hover:text-white"
+            onClick={() => window.history.pushState(null, "", "/")}
+          >
+            Back To Home
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-24 px-6 lg:px-8 bg-background">
       <div className="max-w-7xl mx-auto">
@@ -28,8 +91,8 @@ export function AdminDashboard() {
           </h3>
 
           <p className="text-muted-foreground text-lg">
-            Admin dashboard planning stub. Route guard and inventory table will
-            be added in the next phases.
+            Admin access confirmed. Inventory table and edit/delete controls
+            will be added in the next implementation phase.
           </p>
         </div>
       </div>
