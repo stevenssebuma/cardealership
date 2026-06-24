@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { isAdminUser, isAuthenticated } from "../../lib/auth";
 import { Button } from "../ui/button";
 import { AdminListingsTable } from "./AdminListingsTable";
@@ -35,10 +36,12 @@ type AdminDashboardProps = {
  *
  * TODO:
  * Replace temporary localStorage-based auth checks with the team's final
- * JWT/auth provider once the backend role payload is confirmed.
+ * JWT/auth provider once the backend role payload and login route are confirmed.
  */
 
 export function AdminDashboard({ vehicles }: AdminDashboardProps) {
+  const [loginNotice, setLoginNotice] = useState("");
+
   const authenticated = isAuthenticated();
   const admin = isAdminUser();
 
@@ -59,11 +62,21 @@ export function AdminDashboard({ vehicles }: AdminDashboardProps) {
             the inventory control panel.
           </p>
 
+          {loginNotice && (
+            <div className="mb-6 rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm text-foreground">
+              {loginNotice}
+            </div>
+          )}
+
           <Button
             className="bg-primary text-white hover:bg-primary/90"
-            onClick={() => window.history.pushState(null, "", "/login?redirect=/admin")}
+            onClick={() =>
+              setLoginNotice(
+                "The login page is not available yet. This admin dashboard is already protected, and final login routing will be connected once the team confirms the auth flow."
+              )
+            }
           >
-            Go To Login
+            Sign In Guidance
           </Button>
         </div>
       </section>
