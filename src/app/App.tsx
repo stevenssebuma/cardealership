@@ -8,6 +8,7 @@ import { Input } from "./components/ui/input";
 import { Card, CardContent } from "./components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { AdminDashboard } from "./components/admin/AdminDashboard";
+import { TestDriveScheduler } from "./components/test-drive/TestDriveScheduler";
 
 function formatUGX(amount: number) {
   if (amount >= 1_000_000_000) return `UGX ${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -34,6 +35,9 @@ export default function App() {
   }, []);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  const scrollToTestDrive = () =>
+    document.getElementById("test-drive")?.scrollIntoView({ behavior: "smooth" });
 
   const vehicles = [
     {
@@ -194,7 +198,7 @@ export default function App() {
               <a href="#services" className="text-sm font-medium hover:text-primary transition-colors">SERVICES</a>
               <a href="#about" className="text-sm font-medium hover:text-primary transition-colors">ABOUT</a>
               <a href="#contact" className="text-sm font-medium hover:text-primary transition-colors">CONTACT</a>
-              <Button className="bg-primary text-white hover:bg-primary/90">BOOK TEST DRIVE</Button>
+              <Button className="bg-primary text-white hover:bg-primary/90" onClick={scrollToTestDrive}>BOOK TEST DRIVE</Button>
             </nav>
             <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</button>
           </div>
@@ -303,6 +307,8 @@ export default function App() {
           </Tabs>
         </div>
       </section>
+
+      <TestDriveScheduler vehicles={vehicles} />
 
       {/* Services Section */}
       <section id="services" className="py-24 px-6 lg:px-8 bg-card border-y border-border">
