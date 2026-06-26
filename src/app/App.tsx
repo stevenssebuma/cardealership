@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import {
   Menu, X, ChevronRight, Phone, Mail, MapPin, Search, Calendar,
   Shield, Wrench, FileText, MessageCircle, ArrowUp
@@ -15,7 +16,40 @@ function formatUGX(amount: number) {
   return `UGX ${amount.toLocaleString()}`;
 }
 
-export default function App() {
+function Login() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-6">
+      <div className="w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-xl">
+        <h1 className="text-4xl font-bold mb-6">Login to Panda Motors</h1>
+        <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <Input type="email" placeholder="Email address" className="h-12" />
+          <Input type="password" placeholder="Password" className="h-12" />
+          <Button type="submit" className="w-full h-12 bg-primary text-white hover:bg-primary/90">LOGIN</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function Register() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-6">
+      <div className="w-full max-w-md bg-card border border-border rounded-3xl p-8 shadow-xl">
+        <h1 className="text-4xl font-bold mb-6">Register with Panda Motors</h1>
+        <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <Input placeholder="Full name" className="h-12" />
+          <Input type="email" placeholder="Email address" className="h-12" />
+          <Input type="tel" placeholder="Phone number" className="h-12" />
+          <Input type="password" placeholder="Password" className="h-12" />
+          <Button type="submit" className="w-full h-12 bg-primary text-white hover:bg-primary/90">REGISTER</Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Main App Content
+function MainApp() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [priceRange, setPriceRange] = useState(500000000);
@@ -23,6 +57,7 @@ export default function App() {
   const [searchYear, setSearchYear] = useState("");
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,7 +69,6 @@ export default function App() {
   }, []);
 
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-
   const scrollToTestDrive = () =>
     document.getElementById("test-drive")?.scrollIntoView({ behavior: "smooth" });
 
@@ -147,9 +181,9 @@ export default function App() {
   const VehicleCard = ({ vehicle }: { vehicle: typeof vehicles[0] }) => (
     <Card className="bg-card border-border overflow-hidden group cursor-pointer transition-all hover:border-primary/50">
       <div className="relative h-64 overflow-hidden">
-        <img 
-          src={vehicle.image} 
-          alt={vehicle.name} 
+        <img
+          src={vehicle.image}
+          alt={vehicle.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
@@ -184,7 +218,7 @@ export default function App() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
               <div className="w-8 h-8 border-2 border-primary flex items-center justify-center"><div className="w-3 h-3 bg-primary" /></div>
               <h1 className="text-2xl font-bold"><span className="text-primary">PANDA</span><span className="text-foreground ml-2">MOTORS</span></h1>
             </div>
@@ -193,6 +227,24 @@ export default function App() {
               <a href="#services" className="text-sm font-medium hover:text-primary transition-colors">SERVICES</a>
               <a href="#about" className="text-sm font-medium hover:text-primary transition-colors">ABOUT</a>
               <a href="#contact" className="text-sm font-medium hover:text-primary transition-colors">CONTACT</a>
+
+              {/* Login/Register Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  className="bg-primary text-white hover:bg-primary/90"
+                  onClick={() => navigate('/login')}
+                >
+                  LOGIN
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary hover:text-white"
+                  onClick={() => navigate('/register')}
+                >
+                  REGISTER
+                </Button>
+              </div>
+
               <Button className="bg-primary text-white hover:bg-primary/90" onClick={scrollToTestDrive}>BOOK TEST DRIVE</Button>
             </nav>
             <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</button>
@@ -305,6 +357,42 @@ export default function App() {
 
       <TestDriveScheduler vehicles={vehicles} />
 
+      {/* Login/Register Section */}
+      <section id="login-register" className="py-24 px-6 lg:px-8 bg-card border-y border-border">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+            <div>
+              <h3 className="text-5xl md:text-6xl font-bold mb-6">LOGIN OR REGISTER</h3>
+              <p className="text-lg text-muted-foreground mb-6">Access your account to manage your vehicle purchases, schedule the best test drives ever, and receive exclusive offers with love.</p>
+              <div className="flex gap-4">
+                <Button
+                  className="bg-primary text-white hover:bg-primary/90"
+                  onClick={() => navigate('/login')}
+                >
+                  LOGIN
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-primary text-primary hover:bg-primary hover:text-white"
+                  onClick={() => navigate('/register')}
+                >
+                  REGISTER
+                </Button>
+              </div>
+            </div>
+            <div className="relative h-96 rounded-lg overflow-hidden bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+              <div className="text-center p-8">
+                <div className="w-24 h-24 border-2 border-primary flex items-center justify-center mx-auto mb-4">
+                  <div className="w-12 h-12 bg-primary" />
+                </div>
+                <h4 className="text-2xl font-bold">Join Panda Motors</h4>
+                <p className="text-muted-foreground mt-2">Create an account or sign in to access exclusive features</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Services Section */}
       <section id="services" className="py-24 px-6 lg:px-8 bg-card border-y border-border">
         <div className="max-w-7xl mx-auto">
@@ -404,5 +492,18 @@ export default function App() {
         </a>
       )}
     </div>
+  );
+}
+
+// Main App with Routes
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/*" element={<MainApp />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
