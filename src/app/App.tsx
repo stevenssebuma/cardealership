@@ -7,6 +7,7 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Card, CardContent } from "./components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { AdminDashboard } from "./components/admin/AdminDashboard";
 import { TestDriveScheduler } from "./components/test-drive/TestDriveScheduler";
 
 function formatUGX(amount: number) {
@@ -136,6 +137,10 @@ export default function App() {
       condition: "New",
     },
   ];
+
+  if (window.location.pathname === "/admin") {
+    return <AdminDashboard vehicles={vehicles} />;
+  }
 
   const filteredVehicles = vehicles.filter(vehicle => {
     const matchesBrand = searchBrand ? vehicle.brand.toLowerCase().includes(searchBrand.toLowerCase()) : true;
