@@ -1,3 +1,9 @@
+import { RouterProvider } from "react-router";
+import { router } from "./routes";
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}
 ﻿import { useState, useEffect } from "react";
 import {
   Menu, X, ChevronRight, Phone, Mail, MapPin, Search, Calendar,
