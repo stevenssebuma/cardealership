@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AddCarFormValues } from "../../lib/adminInventory";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
@@ -14,6 +14,8 @@ const steps = [
   "Review",
 ];
 
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+
 const initialValues: AddCarFormValues = {
   make: "",
   model: "",
@@ -28,6 +30,22 @@ function isValidYear(value: string) {
   const currentYear = new Date().getFullYear() + 1;
 
   return Number.isInteger(year) && year >= 1900 && year <= currentYear;
+}
+
+function validateImageFile(file: File | null) {
+  if (!file) {
+    return "Please select at least one vehicle image.";
+  }
+
+  if (!file.type.startsWith("image/")) {
+    return "Selected file must be an image.";
+  }
+
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return "Image must be under 5MB.";
+  }
+
+  return "";
 }
 
 function validateFields(values: AddCarFormValues, step?: number) {
@@ -71,12 +89,19 @@ function validateFields(values: AddCarFormValues, step?: number) {
   }
 
   if (shouldValidateImage) {
-    if (!values.imageFile) {
-      nextErrors.imageFile = "Please select at least one vehicle image.";
+    const imageError = validateImageFile(values.imageFile);
+
+    if (imageError) {
+      nextErrors.imageFile = imageError;
     }
   }
 
   return nextErrors;
+}
+
+function formatFileSize(bytes: number) {
+  const megabytes = bytes / (1024 * 1024);
+  return `${megabytes.toFixed(2)}MB`;
 }
 
 export function AddNewCarForm() {
@@ -84,11 +109,24 @@ export function AddNewCarForm() {
   const [values, setValues] = useState<AddCarFormValues>(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
 
   const selectedFileName = useMemo(
     () => values.imageFile?.name ?? "No image selected yet",
     [values.imageFile]
   );
+
+  useEffect(() => {
+    if (!values.imageFile || !values.imageFile.type.startsWith("image/")) {
+      setImagePreviewUrl("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(values.imageFile);
+    setImagePreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [values.imageFile]);
 
   function updateField<Field extends keyof AddCarFormValues>(
     field: Field,
@@ -96,7 +134,7 @@ export function AddNewCarForm() {
   ) {
     setValues((currentValues) => ({
       ...currentValues,
-      value,
+      [field]: value,
     }));
 
     setErrors((currentErrors) => {
@@ -104,6 +142,19 @@ export function AddNewCarForm() {
       delete nextErrors[field];
       return nextErrors;
     });
+  }
+
+  function handleImageChange(file: File | null) {
+    updateField("imageFile", file);
+
+    const imageError = validateImageFile(file);
+
+    if (imageError) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        imageFile: imageError,
+      }));
+    }
   }
 
   function validateCurrentStep() {
@@ -150,6 +201,7 @@ export function AddNewCarForm() {
     setErrors({});
     setCurrentStep(0);
     setSubmitted(false);
+    setImagePreviewUrl("");
   }
 
   return (
@@ -293,7 +345,7 @@ export function AddNewCarForm() {
           )}
 
           {currentStep === 2 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="imageFile">Vehicle Picture</Label>
                 <Input
@@ -301,15 +353,28 @@ export function AddNewCarForm() {
                   type="file"
                   accept="image/*"
                   onChange={(event) =>
-                    updateField(
-                      "imageFile",
-                      event.target.files?.[0] ?? null
-                    )
+                    handleImageChange(event.target.files?.[0] ?? null)
                   }
                 />
-                <p className="text-sm text-muted-foreground">
-                  {selectedFileName}
-                </p>
+
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-sm font-medium">{selectedFileName}</p>
+
+                  {values.imageFile && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Size: {formatFileSize(values.imageFile.size)}
+                    </p>
+                  )}
+
+                  {imagePreviewUrl && (
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Selected vehicle preview"
+                      className="mt-4 h-40 w-full rounded-md object-cover border border-border"
+                    />
+                  )}
+                </div>
+
                 {errors.imageFile && (
                   <p className="text-sm font-medium text-red-600">
                     {errors.imageFile}
@@ -318,8 +383,8 @@ export function AddNewCarForm() {
               </div>
 
               <p className="text-sm text-muted-foreground">
-                Image upload will later connect to the team's cloud upload
-                endpoint. For now, this step validates that an image is selected.
+                Image upload will later connect to <code>POST /api/cars/upload</code>.
+                For now, this step validates image type and keeps files under 5MB.
               </p>
             </div>
           )}
@@ -349,6 +414,14 @@ export function AddNewCarForm() {
                   <span className="font-semibold">Image:</span>{" "}
                   {selectedFileName}
                 </p>
+
+                {imagePreviewUrl && (
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Selected vehicle review preview"
+                    className="mt-4 h-48 w-full rounded-md object-cover border border-border"
+                  />
+                )}
               </CardContent>
             </Card>
           )}
