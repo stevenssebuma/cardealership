@@ -41,3 +41,23 @@ export async function submitTestDriveBookingDraft(
     message: "Booking payload prepared. Backend endpoint connection pending.",
   };
 }
+
+export const CARS_ENDPOINT = "/api/cars";
+
+export type PaginatedCarsQuery = {
+  page: number;
+  limit: number;
+};
+
+/**
+ * Future API contract for Ronald's paginated car endpoint.
+ *
+ * Expected backend route:
+ * GET /api/cars?page=1&limit=12
+ *
+ * This helper only builds the URL for now.
+ * The admin table still uses local vehicle data until the backend endpoint is confirmed.
+ */
+export function buildPaginatedCarsUrl({ page, limit }: PaginatedCarsQuery) {
+  return `${CARS_ENDPOINT}?page=${page}&limit=${limit}`;
+}

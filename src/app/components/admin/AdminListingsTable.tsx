@@ -11,6 +11,7 @@ import {
 } from "../ui/table";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import type { VehicleStatus } from "../../lib/adminInventory";
+import { buildPaginatedCarsUrl } from "../../lib/api";
 import { EditVehicleModal } from "./EditVehicleModal";
 
 type AdminVehicle = {
@@ -33,6 +34,8 @@ type AdminVehicle = {
 type AdminListingsTableProps = {
   vehicles: AdminVehicle[];
 };
+
+const DEFAULT_PAGE_SIZE = 12;
 
 function formatUGX(amount: number) {
   if (amount >= 1_000_000_000) return `UGX ${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -66,11 +69,16 @@ function getStatusBadgeClass(status: VehicleStatus) {
 
 export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
   const [listings, setListings] = useState(vehicles);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [isLoading] = useState(false);
+  const [errorMessage] = useState("");
   const [vehicleToDelete, setVehicleToDelete] = useState<AdminVehicle | null>(null);
   const [vehicleToEdit, setVehicleToEdit] = useState<AdminVehicle | null>(null);
 
   useEffect(() => {
     setListings(vehicles);
+    setCurrentPage(1);
   }, [vehicles]);
 
   function handleConfirmDelete() {
@@ -103,6 +111,36 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
     setVehicleToEdit(null);
   }
 
+  const totalPages = Math.max(1, Math.ceil(listings.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentPageListings = listings.slice(startIndex, endIndex);
+  const paginatedCarsUrl = buildPaginatedCarsUrl({
+    page: safeCurrentPage,
+    limit: pageSize,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-8 text-center">
+        <h4 className="text-2xl font-bold mb-2">Loading Listings</h4>
+        <p className="text-muted-foreground">
+          Preparing the latest inventory records...
+        </p>
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="rounded-lg border border-red-300 bg-red-50 p-8 text-center text-red-700">
+        <h4 className="text-2xl font-bold mb-2">Unable To Load Listings</h4>
+        <p>{errorMessage}</p>
+      </div>
+    );
+  }
+
   if (!listings.length) {
     return (
       <div className="rounded-lg border border-border bg-card p-8 text-center">
@@ -133,7 +171,7 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
             </TableHeader>
 
             <TableBody>
-              {listings.map((vehicle) => (
+              {currentPageListings.map((vehicle) => (
                 <TableRow key={vehicle.id}>
                   <TableCell>
                     <div className="flex items-center gap-3 min-w-[240px]">
@@ -193,6 +231,42 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
               ))}
             </TableBody>
           </Table>
+        </div>
+
+        <div className="flex flex-col gap-4 border-t border-border px-4 py-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-sm text-muted-foreground">
+            Page {safeCurrentPage} of {totalPages} · Showing{" "}
+            {listings.length ? startIndex + 1 : 0}-
+            {Math.min(endIndex, listings.length)} of {listings.length} listings
+          </div>
+
+          <div className="text-xs text-muted-foreground">
+            Future API: {paginatedCarsUrl}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={safeCurrentPage === 1}
+              onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+            >
+              Previous
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={safeCurrentPage === totalPages}
+              onClick={() =>
+                setCurrentPage((page) => Math.min(page + 1, totalPages))
+              }
+            >
+              Next
+            </Button>
+          </div>
         </div>
       </div>
 
