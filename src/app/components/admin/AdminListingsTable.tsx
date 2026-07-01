@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import {
   Table,
   TableBody,
@@ -9,6 +10,7 @@ import {
   TableRow,
 } from "../ui/table";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
+import type { VehicleStatus } from "../../lib/adminInventory";
 import { EditVehicleModal } from "./EditVehicleModal";
 
 type AdminVehicle = {
@@ -19,6 +21,7 @@ type AdminVehicle = {
   year: number;
   price: number;
   condition: string;
+  status?: VehicleStatus;
   image: string;
   specs: {
     power: string;
@@ -35,6 +38,30 @@ function formatUGX(amount: number) {
   if (amount >= 1_000_000_000) return `UGX ${(amount / 1_000_000_000).toFixed(1)}B`;
   if (amount >= 1_000_000) return `UGX ${(amount / 1_000_000).toFixed(0)}M`;
   return `UGX ${amount.toLocaleString()}`;
+}
+
+function getVehicleStatus(vehicle: AdminVehicle): VehicleStatus {
+  if (vehicle.status) {
+    return vehicle.status;
+  }
+
+  if (vehicle.condition === "Sold") {
+    return "Sold";
+  }
+
+  return "Available";
+}
+
+function getStatusBadgeClass(status: VehicleStatus) {
+  if (status === "Available") {
+    return "bg-green-600 text-white hover:bg-green-700";
+  }
+
+  if (status === "Pending Test Drive") {
+    return "bg-yellow-500 text-black hover:bg-yellow-600";
+  }
+
+  return "bg-muted text-muted-foreground hover:bg-muted";
 }
 
 export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
@@ -99,6 +126,7 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
                 <TableHead>Year</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Condition</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Drive</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -133,6 +161,11 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
                     {formatUGX(vehicle.price)}
                   </TableCell>
                   <TableCell>{vehicle.condition}</TableCell>
+                  <TableCell>
+                    <Badge className={getStatusBadgeClass(getVehicleStatus(vehicle))}>
+                      {getVehicleStatus(vehicle)}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{vehicle.specs.drive}</TableCell>
 
                   <TableCell>
