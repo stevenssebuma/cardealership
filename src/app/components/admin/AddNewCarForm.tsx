@@ -30,6 +30,55 @@ function isValidYear(value: string) {
   return Number.isInteger(year) && year >= 1900 && year <= currentYear;
 }
 
+function validateFields(values: AddCarFormValues, step?: number) {
+  const nextErrors: FormErrors = {};
+
+  const shouldValidateIdentity = step === undefined || step === 0;
+  const shouldValidatePricing = step === undefined || step === 1;
+  const shouldValidateImage = step === undefined || step === 2;
+
+  if (shouldValidateIdentity) {
+    if (!values.make.trim()) {
+      nextErrors.make = "Make is required.";
+    }
+
+    if (!values.model.trim()) {
+      nextErrors.model = "Model is required.";
+    }
+
+    if (!values.year.trim()) {
+      nextErrors.year = "Year is required.";
+    } else if (!isValidYear(values.year)) {
+      nextErrors.year = "Year must be valid.";
+    }
+  }
+
+  if (shouldValidatePricing) {
+    const price = Number(values.price);
+    const mileage = Number(values.mileage);
+
+    if (!values.price.trim()) {
+      nextErrors.price = "Price is required.";
+    } else if (Number.isNaN(price) || price <= 0) {
+      nextErrors.price = "Price must be greater than zero.";
+    }
+
+    if (!values.mileage.trim()) {
+      nextErrors.mileage = "Mileage is required.";
+    } else if (Number.isNaN(mileage) || mileage < 0) {
+      nextErrors.mileage = "Mileage cannot be negative.";
+    }
+  }
+
+  if (shouldValidateImage) {
+    if (!values.imageFile) {
+      nextErrors.imageFile = "Please select at least one vehicle image.";
+    }
+  }
+
+  return nextErrors;
+}
+
 export function AddNewCarForm() {
   const [currentStep, setCurrentStep] = useState(0);
   const [values, setValues] = useState<AddCarFormValues>(initialValues);
@@ -47,64 +96,32 @@ export function AddNewCarForm() {
   ) {
     setValues((currentValues) => ({
       ...currentValues,
-      [field]: value,
+      value,
     }));
 
-    setErrors((currentErrors) => ({
-      ...currentErrors,
-      [field]: undefined,
-    }));
+    setErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[field];
+      return nextErrors;
+    });
   }
 
-  function validateStep(step: number) {
-    const nextErrors: FormErrors = {};
+  function validateCurrentStep() {
+    const nextErrors = validateFields(values, currentStep);
+    setErrors(nextErrors);
 
-    if (step === 0) {
-      if (!values.make.trim()) {
-        nextErrors.make = "Make is required.";
-      }
+    return Object.keys(nextErrors).length === 0;
+  }
 
-      if (!values.model.trim()) {
-        nextErrors.model = "Model is required.";
-      }
-
-      if (!values.year.trim()) {
-        nextErrors.year = "Year is required.";
-      } else if (!isValidYear(values.year)) {
-        nextErrors.year = "Year must be valid.";
-      }
-    }
-
-    if (step === 1) {
-      const price = Number(values.price);
-      const mileage = Number(values.mileage);
-
-      if (!values.price.trim()) {
-        nextErrors.price = "Price is required.";
-      } else if (Number.isNaN(price) || price <= 0) {
-        nextErrors.price = "Price must be greater than zero.";
-      }
-
-      if (!values.mileage.trim()) {
-        nextErrors.mileage = "Mileage is required.";
-      } else if (Number.isNaN(mileage) || mileage < 0) {
-        nextErrors.mileage = "Mileage cannot be negative.";
-      }
-    }
-
-    if (step === 2) {
-      if (!values.imageFile) {
-        nextErrors.imageFile = "Please select at least one vehicle image.";
-      }
-    }
-
+  function validateEntireForm() {
+    const nextErrors = validateFields(values);
     setErrors(nextErrors);
 
     return Object.keys(nextErrors).length === 0;
   }
 
   function handleNext() {
-    if (!validateStep(currentStep)) {
+    if (!validateCurrentStep()) {
       return;
     }
 
@@ -112,13 +129,12 @@ export function AddNewCarForm() {
   }
 
   function handleBack() {
+    setErrors({});
     setCurrentStep((step) => Math.max(step - 1, 0));
   }
 
   function handleSubmit() {
-    const allStepsValid = [0, 1, 2].every((step) => validateStep(step));
-
-    if (!allStepsValid) {
+    if (!validateEntireForm()) {
       return;
     }
 
@@ -244,7 +260,8 @@ export function AddNewCarForm() {
                   id="price"
                   type="number"
                   min="1"
-                  value={values.       onChange={(event) => updateField("price", event.target.value)}
+                  value={values.price}
+                  onChange={(event) => updateField("price", event.target.value)}
                   placeholder="85000000"
                 />
                 {errors.price && (
