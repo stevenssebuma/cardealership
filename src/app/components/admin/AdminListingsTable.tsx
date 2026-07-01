@@ -103,6 +103,7 @@ export function AdminListingsTable({ vehicles }: AdminListingsTableProps) {
               ...vehicle,
               price: updatedVehicle.price,
               condition: updatedVehicle.condition,
+              status: updatedVehicle.status,
             }
           : vehicle
       )
