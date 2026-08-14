@@ -1,12 +1,12 @@
-{
+﻿{
   "name": "@figma/my-make-file-backend",
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "main": "server.cjs",
+  "main": "server.js",
   "scripts": {
-    "start": "node server.cjs",
-    "dev": "node server.cjs",
+    "start": "node server.js",
+    "dev": "node server.js",
     "build": "vite build",
     "cleanup:car-images": "node scripts/cleanupStaleCarImages.js --dry-run",
     "cleanup:car-images:execute": "node scripts/cleanupStaleCarImages.js --execute",
@@ -27,3 +27,5 @@
     "nodemon": "^3.1.14"
   }
 }
+
+
