@@ -1,6 +1,7 @@
 ﻿import { BrowserRouter, Route, Routes } from "react-router-dom";
+import Profile from "../pages/profile";
 import { AuthProvider } from "./context/auth";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
 import Login from "../pages/Login";
 import RegisterPage from "../pages/Register";
@@ -16,8 +17,13 @@ export default function App() {
           <Route path="/test" element={<TestTasks />} />
           <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/Admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/Admin" element={<Admin />} />
+          </Route>
           <Route path="/*" element={<HomePage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/profile" element={<Profile />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </AuthProvider>

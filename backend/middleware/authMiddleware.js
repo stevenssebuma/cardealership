@@ -38,9 +38,9 @@ export const authenticateToken = (req, res, next) => {
                 error: 'Token has expired. Please login again.'
             });
         }
-        return res.status(403).json({
+        return res.status(401).json({
             success: false,
-            error: 'Invalid token. Access denied.'
+            message: 'Invalid or expired token. Please login again.'
         });
     }
 };
@@ -59,7 +59,7 @@ export const checkRole = (allowedRoles) => {
         }
 
         const userRole = req.user.role || 'user';
-        
+
         if (!allowedRoles.includes(userRole)) {
             return res.status(403).json({
                 success: false,
@@ -142,26 +142,26 @@ const loginAttempts = new Map();
 export const rateLimitLogin = (req, res, next) => {
     const ip = req.ip || req.connection.remoteAddress;
     const now = Date.now();
-    
+
     if (!loginAttempts.has(ip)) {
         loginAttempts.set(ip, []);
     }
-    
+
     const attempts = loginAttempts.get(ip);
-    
+
     // Remove attempts older than 15 minutes
     const recentAttempts = attempts.filter(time => now - time < 15 * 60 * 1000);
-    
+
     if (recentAttempts.length >= 5) {
         return res.status(429).json({
             success: false,
             error: 'Too many login attempts. Please try again in 15 minutes.'
         });
     }
-    
+
     recentAttempts.push(now);
     loginAttempts.set(ip, recentAttempts);
-    
+
     next();
 };
 

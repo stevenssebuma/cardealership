@@ -1,18 +1,43 @@
 import type { ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, Outlet } from "react-router-dom";
 import { LoadingSpinner } from "../../../components/common/LoadingSpinner/LoadingSpinner";
 import { useAuth } from "../../../features/auth/hooks";
 import { getProtectedRouteDecision } from "./routeAccess";
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthReady, isAuthenticated } = useAuth();
-  const location = useLocation();
-  const decision = getProtectedRouteDecision(isAuthReady, isAuthenticated);
 
-  if (decision === "loading") return <LoadingSpinner />;
-  if (decision === "redirect-login") {
-    const requestedPath = `${location.pathname}${location.search}${location.hash}`;
-    return <Navigate to={`/login?redirect=${encodeURIComponent(requestedPath)}`} replace />;
+interface User {
+  role?: string;
+}
+
+interface ProtectedRouteProps {
+  adminOnly?: boolean;
+}
+
+export default function ProtectedRoute({
+  adminOnly = false,
+}: ProtectedRouteProps) {
+  const token = localStorage.getItem("token");
+  const storedUser = localStorage.getItem("user");
+
+  let user: User | null = null;
+
+  if (storedUser) {
+    try {
+      user = JSON.parse(storedUser);
+    } catch {
+      user = null;
+    }
   }
-  return <>{children}</>;
+
+  // User is not logged in
+  if (!token || !user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Admin page but user is not an admin
+  if (adminOnly && user.role !== "admin") {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
 }

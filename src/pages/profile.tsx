@@ -1,163 +1,75 @@
-
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 // @ts-ignore: Allow side-effect CSS import without type declarations
-import "./profile.css";
-
+import "./Profile.css";
 
 interface User {
-    name: string;
-    email: string;
-    createdAt: string;
+  id?: number;
+  name?: string;
+  email?: string;
+  role?: string;
+  registrationDate?: string;
+  created_at?: string;
+  createdAt?: string;
 }
 
 export default function Profile() {
-    const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
 
-    const [user, setUser] = useState<User>({
-        name: "",
-        email: "",
-        createdAt: "",
-    });
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
 
-    const [isEditing, setIsEditing] = useState(false);
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error("Could not read user information:", error);
+      }
+    }
+  }, []);
 
-    useEffect(() => {
-        const savedUser = localStorage.getItem("user");
-
-        if (savedUser) {
-            setUser(JSON.parse(savedUser));
-        }
-    }, []);
-
-
-    const handleSave = () => {
-
-        localStorage.setItem(
-            "user",
-            JSON.stringify(user)
-        );
-
-        setIsEditing(false);
-
-        alert("Profile updated successfully!");
-    };
-
-
-    const handleLogout = () => {
-
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        alert("Logged out successfully");
-
-        navigate("/login");
-    };
-
-
+  if (!user) {
     return (
-        <div className="profile-container">
-
-            <div className="profile-card">
-
-                <h1>
-                    Welcome, {user.name}
-                </h1>
-
-                <p className="subtitle">
-                    Manage your account information
-                </p>
-
-
-                <div className="profile-info">
-
-
-                    <label>
-                        Full Name
-                    </label>
-
-                    <input
-                        type="text"
-                        value={user.name}
-                        disabled={!isEditing}
-                        onChange={(e) =>
-                            setUser({
-                                ...user,
-                                name: e.target.value
-                            })
-                        }
-                    />
-
-
-                    <label>
-                        Email Address
-                    </label>
-
-                    <input
-                        type="email"
-                        value={user.email}
-                        disabled={!isEditing}
-                        onChange={(e) =>
-                            setUser({
-                                ...user,
-                                email: e.target.value
-                            })
-                        }
-                    />
-
-
-                    <label>
-                        Registration Date
-                    </label>
-
-                    <input
-                        value={user.createdAt}
-                        disabled
-                    />
-
-
-                </div>
-
-
-                <div className="profile-buttons">
-
-                    {
-                        isEditing ? (
-
-                            <button onClick={handleSave}>
-                                Save Changes
-                            </button>
-
-                        ) : (
-
-                            <button
-                                onClick={() => setIsEditing(true)}
-                            >
-                                Edit Profile
-                            </button>
-
-                        )
-                    }
-
-                    <button
-                        onClick={() => navigate("/")}
-                    >
-                        Back to Home
-                    </button>
-
-                    <button
-                        className="logout"
-                        onClick={handleLogout}
-                    >
-                        Logout
-                    </button>
-
-
-                </div>
-
-
-            </div>
-
-        </div>
+      <div className="profile-page">
+        <h1>My Profile</h1>
+        <p>No user information found. Please log in.</p>
+      </div>
     );
+  }
+
+  const registrationDate =
+    user.registrationDate ||
+    user.created_at ||
+    user.createdAt;
+
+  return (
+    <div className="profile-page">
+      <div className="profile-card">
+        <h1>My Profile</h1>
+
+        <div className="profile-section">
+          <label>Name</label>
+          <p>{user.name || "Not provided"}</p>
+        </div>
+
+        <div className="profile-section">
+          <label>Email</label>
+          <p>{user.email || "Not provided"}</p>
+        </div>
+
+        <div className="profile-section">
+          <label>Registration Date</label>
+          <p>
+            {registrationDate
+              ? new Date(registrationDate).toLocaleDateString()
+              : "Not available"}
+          </p>
+        </div>
+
+        <div className="profile-section">
+          <label>Account Type</label>
+          <p>{user.role || "user"}</p>
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -1,6 +1,11 @@
 import bcrypt from "bcrypt";
 
-import { findUserByEmail, createUser } from "../models/userModel.js";
+import {
+  findUserByEmail,
+  findUserById,
+  createUser,
+  updateUserProfile,
+} from "../models/userModel.js";
 
 import { generateToken } from "../utils/jwt.js";
 
@@ -128,6 +133,105 @@ export const login = async (req, res) => {
       success: false,
       message: "Login failed.",
       error: error.message,
+    });
+  }
+};
+
+/* 
+|--------------------------------------------------------------------------
+| UPDATE CURRENT USER PROFILE
+|--------------------------------------------------------------------------
+*/
+
+export const updateCurrentUser = async (req, res) => {
+  try {
+    // The user ID comes from the verified JWT.
+    // It does NOT come from the URL or request body.
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const { name, email } = req.body;
+
+    // Validate required fields
+    if (
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      !name.trim() ||
+      !email.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and email are required.",
+      });
+    }
+
+    const normalizedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address.",
+      });
+    }
+
+    // Check whether another user already owns this email
+    const existingUser = await findUserByEmail(normalizedEmail);
+
+    if (existingUser && Number(existingUser.id) !== Number(userId)) {
+      return res.status(409).json({
+        success: false,
+        message: "Email is already in use.",
+      });
+    }
+
+    // Update the authenticated user's profile
+    const updatedUser = await updateUserProfile(
+      userId,
+      normalizedName,
+      normalizedEmail
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      user: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+      },
+    });
+    } catch (error) {
+    console.error("Profile update failed:", error);
+
+    // PostgreSQL unique constraint violation
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "Email is already in use.",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Profile update failed.",
     });
   }
 };
