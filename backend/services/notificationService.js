@@ -1,3 +1,5 @@
+import nodemailer from "nodemailer";
+
 import {
   getEmailConfig,
   getEmailProvider,
@@ -5,6 +7,7 @@ import {
   getRequiredEmailEnvironmentKeys,
   isEmailProviderConfigured,
 } from "../config/email.js";
+
 import { buildAppointmentConfirmationTemplate } from "../templates/appointmentConfirmation.js";
 
 function isValidEmail(value) {
@@ -15,7 +18,11 @@ function isValidEmail(value) {
   const atIndex = value.indexOf("@");
   const dotIndex = value.lastIndexOf(".");
 
-  return atIndex > 0 && dotIndex > atIndex + 1 && dotIndex < value.length - 1;
+  return (
+    atIndex > 0 &&
+    dotIndex > atIndex + 1 &&
+    dotIndex < value.length - 1
+  );
 }
 
 export function validateAppointmentNotificationPayload(payload) {
@@ -88,16 +95,63 @@ export async function sendAppointmentConfirmationEmail(payload) {
     };
   }
 
+  if (provider !== "nodemailer") {
+    return {
+      sent: false,
+      skipped: true,
+      provider,
+      reason: `Email provider '${provider}' is not supported by this transport.`,
+      message,
+    };
+  }
+
   const config = getEmailConfig();
 
-  return {
-    sent: false,
-    skipped: true,
-    provider,
-    reason:
-      "Outbound email transport is not connected yet. Message was built and validated successfully.",
-    config: getRedactedEmailConfig(),
-    message,
-    transportReady: Boolean(config),
-  };
+  const transporter = nodemailer.createTransport({
+    host: config.nodemailer.host,
+    port: Number(config.nodemailer.port),
+    secure: config.nodemailer.secure,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  try {
+    const mailOptions = {
+      from: config.from,
+      to: payload.to,
+      replyTo: config.replyTo,
+      subject: "Panda Motors - Test Drive Confirmation",
+    };
+
+    if (typeof message === "string") {
+      mailOptions.html = message;
+    } else {
+      mailOptions.html = message.html;
+      mailOptions.text = message.text;
+      mailOptions.subject =
+        message.subject || "Panda Motors - Test Drive Confirmation";
+    }
+
+    const info = await transporter.sendMail(mailOptions);
+
+    return {
+      sent: true,
+      skipped: false,
+      provider: "nodemailer",
+      messageId: info.messageId,
+      reason: "Appointment confirmation email sent successfully.",
+    };
+  } catch (error) {
+    console.error("Nodemailer email error:", error.message);
+
+    return {
+      sent: false,
+      skipped: false,
+      provider: "nodemailer",
+      reason: "Failed to send appointment confirmation email.",
+      error: error.message,
+    };
+  }
 }

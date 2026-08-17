@@ -15,6 +15,8 @@ import bookingRoutes from './routes/bookingRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import optimizedRoutes from './routes/optimizedRoutes.js';
 import adminMetricsRoutes from './routes/adminMetricsRoutes.js';
+import { startTestDriveReminderJob } from "./jobs/testDriveReminderJob.js";
+
 
 // Import performance middleware
 import { performanceMiddleware } from './middleware/performanceMiddleware.js';
@@ -76,7 +78,7 @@ app.post('/api/finance/calculate', (req, res) => {
 
         // STEP 2: Input Validation
         // Check if all required fields are present
-        if (carPrice === undefined || downPayment === undefined || 
+        if (carPrice === undefined || downPayment === undefined ||
             interestRate === undefined || loanTermMonths === undefined) {
             return res.status(400).json({
                 error: 'Missing required fields',
@@ -106,10 +108,10 @@ app.post('/api/finance/calculate', (req, res) => {
 
         // STEP 4: Calculate the loan amount
         const loanAmount = price - down;
-        
+
         // Check if down payment is larger than car price
         if (loanAmount <= 0) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'Down payment must be less than car price',
                 message: 'Your down payment already covers the full price!'
             });
@@ -130,7 +132,7 @@ app.post('/api/finance/calculate', (req, res) => {
         // r = monthly interest rate
         // PV = present value (loan amount)
         // n = number of payments (term)
-        
+
         if (monthlyRate === 0) {
             // If interest rate is 0%, it's simple division
             monthlyPayment = loanAmount / term;
@@ -148,7 +150,7 @@ app.post('/api/finance/calculate', (req, res) => {
         // This shows how each payment breaks down into principal + interest
         const paymentSchedule = [];
         let remainingBalance = loanAmount;
-        
+
         for (let month = 1; month <= Math.min(6, term); month++) {
             // Interest for this month = remaining balance * monthly rate
             const interestPayment = remainingBalance * monthlyRate;
@@ -156,7 +158,7 @@ app.post('/api/finance/calculate', (req, res) => {
             const principalPayment = monthlyPayment - interestPayment;
             // New remaining balance
             remainingBalance -= principalPayment;
-            
+
             paymentSchedule.push({
                 month: month,
                 payment: Math.round(monthlyPayment),
@@ -188,9 +190,9 @@ app.post('/api/finance/calculate', (req, res) => {
     } catch (error) {
         // Handle any unexpected errors
         console.error('Calculation error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error', 
-            message: error.message 
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error.message
         });
     }
 });
@@ -209,7 +211,7 @@ app.get('/api/dealership/location', (req, res) => {
                 // Basic info
                 name: 'Panda Motors Ltd',
                 description: 'Uganda\'s trusted luxury vehicle importer',
-                
+
                 // Address - structured for easy display
                 address: {
                     street: 'Banda, Jinja Road',
@@ -218,7 +220,7 @@ app.get('/api/dealership/location', (req, res) => {
                     country: 'Uganda',
                     fullAddress: 'Banda, Jinja Road, Kampala, Uganda'
                 },
-                
+
                 // LOCATION COORDINATES - For Google Maps integration
                 // These coordinates point to Banda, Kampala, Uganda
                 location: {
@@ -226,7 +228,7 @@ app.get('/api/dealership/location', (req, res) => {
                     longitude: 32.6160,   // Decimal degrees
                     zoom: 15              // Recommended zoom level for map
                 },
-                
+
                 // Operating hours for each day
                 operatingHours: {
                     monday: { open: '08:00', close: '18:00', isOpen: true },
@@ -237,14 +239,14 @@ app.get('/api/dealership/location', (req, res) => {
                     saturday: { open: '09:00', close: '17:00', isOpen: true },
                     sunday: { open: '00:00', close: '00:00', isOpen: false, note: 'Closed' }
                 },
-                
+
                 // Contact information
                 contact: {
                     phone: ['+256 770 826 951', '+256 756 053 475'],
                     whatsapp: '+256 770 826 951',
                     email: 'sales@pandamotors.co.ug'
                 },
-                
+
                 // Services offered
                 services: [
                     'URA Duty Clearance',
@@ -252,7 +254,7 @@ app.get('/api/dealership/location', (req, res) => {
                     'Certified Workshop',
                     'Flexible Financing'
                 ],
-                
+
                 // GOOGLE MAPS INTEGRATION URLs
                 // These URLs can be used directly in frontend map components
                 googleMapsUrl: 'https://maps.google.com/?q=Banda,+Jinja+Road,+Kampala,+Uganda',
@@ -266,9 +268,9 @@ app.get('/api/dealership/location', (req, res) => {
 
     } catch (error) {
         console.error('Location error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error', 
-            message: error.message 
+        res.status(500).json({
+            error: 'Internal server error',
+            message: error.message
         });
     }
 });
@@ -282,14 +284,14 @@ app.get('/api/dealership/status', (req, res) => {
     const now = new Date();
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     const currentDay = dayNames[now.getDay()];
-    
+
     // Format current time as HH:MM
-    const currentTime = now.toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit' 
+    const currentTime = now.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
     });
-    
+
     // Operating hours (same as above)
     const hours = {
         monday: { open: '08:00', close: '18:00' },
@@ -300,12 +302,12 @@ app.get('/api/dealership/status', (req, res) => {
         saturday: { open: '09:00', close: '17:00' },
         sunday: { open: '00:00', close: '00:00' }
     };
-    
+
     const todayHours = hours[currentDay];
-    const isOpen = currentDay !== 'sunday' && 
-                   currentTime >= todayHours.open && 
-                   currentTime <= todayHours.close;
-    
+    const isOpen = currentDay !== 'sunday' &&
+        currentTime >= todayHours.open &&
+        currentTime <= todayHours.close;
+
     res.json({
         success: true,
         currentTime: currentTime,
@@ -322,41 +324,41 @@ app.get('/api/dealership/status', (req, res) => {
 // GET /api/health
 // Simple endpoint to verify the API is running
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        status: 'OK', 
+    res.json({
+        status: 'OK',
         timestamp: new Date().toISOString(),
         message: 'Panda Motors API is running!',
         version: '2.0.0',
         endpoints: [
             // Financial
             'POST /api/finance/calculate - Calculate loan payments',
-            
+
             // Dealership
             'GET /api/dealership/location - Get dealership location',
             'GET /api/dealership/status - Check if open',
-            
+
             // Bookings
             'POST /api/bookings/create - Book test drive',
             'GET /api/bookings/check-availability - Check availability',
             'GET /api/bookings/user/:user_id - Get user bookings',
             'PUT /api/bookings/:id/cancel - Cancel booking',
-            
+
             // Admin Analytics
             'GET /api/admin/stats - Full admin statistics',
             'GET /api/admin/stats/summary - Quick summary',
-            
+
             // Performance & Optimized Queries (NEW)
             'GET /api/optimized/search - Optimized inventory search',
             'GET /api/optimized/availability - Quick availability check',
             'GET /api/optimized/stats - Inventory statistics',
             'GET /api/optimized/most-searched - Most searched makes',
             'GET /api/optimized/performance - Query performance report',
-            
+
             // Admin Metrics Dashboard (NEW)
             'GET /api/admin/metrics - Full admin dashboard metrics',
             'GET /api/admin/metrics/inventory - Inventory metrics only',
             'GET /api/admin/metrics/bookings - Booking metrics only',
-            
+
             // Health
             'GET /api/health - Health check'
         ]
@@ -385,40 +387,43 @@ app.listen(PORT, async () => {
     console.log('========================================');
     console.log(`?? Server running on: http://localhost:${PORT}`);
     console.log(`?? Environment: ${process.env.NODE_ENV || 'development'}`);
-    
+
     // Initialize database
     await initializeDatabase();
-    
+
+    // Start the test drive reminder background job
+    startTestDriveReminderJob();
+
     console.log('\n?? Available Endpoints:');
     console.log('   --- Financial ---');
     console.log(`   POST /api/finance/calculate  - Loan calculator`);
-    
+
     console.log('   --- Dealership ---');
     console.log(`   GET  /api/dealership/location - Store location`);
     console.log(`   GET  /api/dealership/status   - Open status`);
-    
+
     console.log('   --- Test Drive Booking ---');
     console.log(`   POST /api/bookings/create     - Book test drive with conflict logic`);
     console.log(`   GET  /api/bookings/check-availability - Check availability`);
     console.log(`   GET  /api/bookings/user/:user_id - Get user bookings`);
     console.log(`   PUT  /api/bookings/:id/cancel - Cancel booking`);
-    
+
     console.log('   --- Admin Analytics ---');
     console.log(`   GET  /api/admin/stats         - Full admin statistics`);
     console.log(`   GET  /api/admin/stats/summary - Quick summary`);
-    
+
     console.log('   --- Performance & Optimized Queries (NEW) ---');
     console.log(`   GET  /api/optimized/search    - Optimized inventory search`);
     console.log(`   GET  /api/optimized/availability - Quick availability check`);
     console.log(`   GET  /api/optimized/stats     - Inventory statistics`);
     console.log(`   GET  /api/optimized/most-searched - Most searched makes`);
     console.log(`   GET  /api/optimized/performance - Query performance report`);
-    
+
     console.log('   --- Admin Metrics Dashboard (NEW) ---');
     console.log(`   GET  /api/admin/metrics       - Full dashboard metrics`);
     console.log(`   GET  /api/admin/metrics/inventory - Inventory metrics only`);
     console.log(`   GET  /api/admin/metrics/bookings - Booking metrics only`);
-    
+
     console.log('   --- Health ---');
     console.log(`   GET  /api/health              - Health check`);
     console.log('========================================\n');

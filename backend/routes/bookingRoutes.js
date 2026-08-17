@@ -1,5 +1,7 @@
 import express from 'express';
 import db from '../config/database.js';
+import { sendTestDriveConfirmation } from '../services/emailService.js';
+
 
 const router = express.Router();
 
@@ -73,18 +75,33 @@ router.post('/create', async (req, res) => {
 
         const result = await db.collection('bookings').insertOne(newBooking);
 
+        console.log(
+            "📧 Sending test drive confirmation email to:",
+            newBooking.user_email
+        );
+
+        await sendTestDriveConfirmation({
+            name: newBooking.user_name,
+            email: newBooking.user_email,
+            date: newBooking.date,
+            time: newBooking.timeSlot
+        });
+
+        console.log("✅ Confirmation email sent");
+
         res.status(201).json({
             success: true,
             booking: { id: result.insertedId, ...newBooking },
             message: `Test drive booked for ${date} at ${time_slot}`
         });
 
+
     } catch (error) {
         console.error('Booking error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: 'Internal server error', 
-            message: error.message 
+            error: 'Internal server error',
+            message: error.message
         });
     }
 });
@@ -119,17 +136,17 @@ router.get('/check-availability', async (req, res) => {
             date,
             availableSlots,
             allSlots: TIME_SLOTS,
-            message: availableSlots.length > 0 
-                ? 'Available slots found' 
+            message: availableSlots.length > 0
+                ? 'Available slots found'
                 : 'No available slots for this date'
         });
 
     } catch (error) {
         console.error('Availability check error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: 'Internal server error', 
-            message: error.message 
+            error: 'Internal server error',
+            message: error.message
         });
     }
 });
@@ -160,10 +177,10 @@ router.get('/user/:user_id', async (req, res) => {
 
     } catch (error) {
         console.error('User bookings error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: 'Internal server error', 
-            message: error.message 
+            error: 'Internal server error',
+            message: error.message
         });
     }
 });
@@ -187,8 +204,8 @@ router.put('/:id/cancel', async (req, res) => {
         await db.collection('bookings')
             .updateOne(
                 { id: id },
-                { 
-                    $set: { 
+                {
+                    $set: {
                         status: 'cancelled',
                         updatedAt: new Date().toISOString()
                     }
@@ -206,10 +223,10 @@ router.put('/:id/cancel', async (req, res) => {
 
     } catch (error) {
         console.error('Cancel booking error:', error);
-        res.status(500).json({ 
+        res.status(500).json({
             success: false,
-            error: 'Internal server error', 
-            message: error.message 
+            error: 'Internal server error',
+            message: error.message
         });
     }
 });

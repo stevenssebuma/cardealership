@@ -1,4 +1,7 @@
 import { sendAppointmentConfirmationEmail } from "../services/notificationService.js";
+import {
+  buildAppointmentConfirmationTemplate,
+} from "../templates/appointmentConfirmation.js";
 
 function buildReference() {
   return `TD-${Date.now()}`;
