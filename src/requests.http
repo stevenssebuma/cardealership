@@ -100,3 +100,84 @@ Content-Type: image/jpeg
 
 < C:/Users/admin/Downloads/toyota-vehicle.jpg
 --CarImageBoundary--
+
+############################################################
+# PANDA MOTORS BACKEND TASK PROOF
+# Ronald - Advanced Search Logic & Error Logging
+#
+# Backend:
+# http://localhost:5000
+############################################################
+
+
+############################################################
+# HEALTH CHECK
+############################################################
+
+### VERIFY BACKEND IS RUNNING
+GET http://localhost:5000/api/health
+
+
+
+############################################################
+# TASK 1
+# MULTI-PARAMETER SORTING & PRICE RANGINGS
+############################################################
+
+
+### TASK 1A - GET ALL CARS
+GET http://localhost:5000/api/cars
+
+
+
+### TASK 1B - PRICE: LOW TO HIGH
+# Expected:
+# Cheapest vehicle should appear first.
+# Prices should increase down the response.
+GET http://localhost:5000/api/cars?sortBy=price_asc
+
+
+
+### TASK 1C - PRICE: HIGH TO LOW
+# Expected:
+# Most expensive vehicle should appear first.
+# Prices should decrease down the response.
+GET http://localhost:5000/api/cars?sortBy=price_desc
+
+
+
+### TASK 1D - NEWEST ARRIVALS BY VEHICLE YEAR
+# Expected:
+# Highest/newest vehicle year should appear first.
+GET http://localhost:5000/api/cars?sortBy=newest
+
+
+
+### TASK 1E - INVALID SORT OPTION
+# Expected:
+# HTTP 400 Bad Request
+# Shows that sortBy is validated.
+GET http://localhost:5000/api/cars?sortBy=random
+
+
+
+############################################################
+# TASK 2
+# PRODUCTION ERROR AGGREGATOR LOGGING - WINSTON
+############################################################
+
+
+### TASK 2A - GENERATE CONTROLLED 500 ERROR
+#
+# Expected:
+# HTTP 500 Internal Server Error
+#
+# Winston should automatically record:
+# - timestamp
+# - statusCode 500
+# - HTTP method
+# - URL
+# - error message
+# - stack trace
+#
+GET http://localhost:5000/api/test-error

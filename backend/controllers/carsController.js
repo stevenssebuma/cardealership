@@ -14,20 +14,75 @@ function sendError(res, status, code, message, details = null) {
 
 /*
 |--------------------------------------------------------------------------
+| SUPPORTED INVENTORY SORT OPTIONS
+|--------------------------------------------------------------------------
+|
+| price_asc  = Price Low to High
+| price_desc = Price High to Low
+| newest     = Newest vehicle year first
+|
+*/
+
+const ALLOWED_SORT_OPTIONS = ["price_asc", "price_desc", "newest"];
+
+/*
+|--------------------------------------------------------------------------
 | GET ALL CARS
 |--------------------------------------------------------------------------
 |
 | GET /api/cars
 |
+| Examples:
+|
+| GET /api/cars
+| GET /api/cars?sortBy=price_asc
+| GET /api/cars?sortBy=price_desc
+| GET /api/cars?sortBy=newest
+|
 */
 
 export async function fetchCars(req, res) {
   try {
-    const cars = await getAllCars();
+    const { sortBy } = req.query;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Validate sortBy
+    |--------------------------------------------------------------------------
+    */
+
+    if (sortBy && !ALLOWED_SORT_OPTIONS.includes(sortBy)) {
+      return sendError(
+        res,
+        400,
+        "INVALID_SORT_OPTION",
+        "Invalid sortBy option.",
+        {
+          received: sortBy,
+          allowed: ALLOWED_SORT_OPTIONS,
+        },
+      );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch sorted inventory from PostgreSQL
+    |--------------------------------------------------------------------------
+    */
+
+    const cars = await getAllCars({
+      sortBy,
+    });
 
     return res.status(200).json({
       success: true,
+
       count: cars.length,
+
+      sorting: {
+        sortBy: sortBy || "default",
+      },
+
       cars,
     });
   } catch (error) {
@@ -80,6 +135,7 @@ export async function fetchCarById(req, res) {
 
     return res.status(200).json({
       success: true,
+
       car: {
         ...result.car,
         images: result.images,
@@ -113,18 +169,28 @@ export async function addCar(req, res) {
   try {
     const {
       name,
+
       brand,
+
       type,
+
       category,
+
       year,
+
       price,
+
       power,
+
       engine,
+
       drive,
+
       images = [],
     } = req.body;
 
     const parsedYear = Number(year);
+
     const parsedPrice = Number(price);
 
     if (!name || !brand) {
@@ -156,20 +222,31 @@ export async function addCar(req, res) {
 
     const carId = await createCar({
       name,
+
       brand,
+
       type,
+
       category,
+
       year: parsedYear,
+
       price: parsedPrice,
+
       power,
+
       engine,
+
       drive,
+
       images,
     });
 
     return res.status(201).json({
       success: true,
+
       message: "Vehicle created successfully.",
+
       car: {
         id: carId,
       },
