@@ -5,9 +5,9 @@
 
 @baseUrl = http://localhost:5500
 
-@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBjYXJzLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4NzQwMzc5OCwiZXhwIjoxNzg4MDA4NTk4fQ.nyFUU1ePa0Ac5F2nkE5ml8Dxxj3Hq6VHLqpFANadjrw
-
-@customerToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjdXN0b21lcjFAY2Fycy5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc4NzQwMzg0NCwiZXhwIjoxNzg4MDA4NjQ0fQ.quiHvGlMGWAH3tyIKpktraHPoVNl2gB56oEz19uOXnI
+# Replace these after running the login requests below.
+@adminToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBjYXJzLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4ODI3MDE4MCwiZXhwIjoxNzg4ODc0OTgwfQ.pt7Ral3xm7GfQL22WGpXzZWz3_TY6z5ynBT75SqlnKE
+@customerToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjdXN0b21lcjFAY2Fycy5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc4ODI3MDI0NCwiZXhwIjoxNzg4ODc1MDQ0fQ.1qYo1CIuQkdYnjyvB1vRmu8hXdk-RZGo1_EGLqfZmkc
 
 
 ############################################################
@@ -150,12 +150,17 @@ Authorization: Bearer {{adminToken}}
 
 ### TEST IMAGE UPLOAD
 POST {{baseUrl}}/api/cars/test-upload
-Content-Type: multipart/form-data
+Content-Type: multipart/form-data; boundary=TestImageBoundary
 
-image: @C:/Users/admin/Downloads/toyota-vehicle.jpg
+--TestImageBoundary
+Content-Disposition: form-data; name="image"; filename="toyota-vehicle.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota-vehicle.jpg
+--TestImageBoundary--
 
 
-### UPLOAD AND OPTIMIZE CAR IMAGE
+### UPLOAD AND OPTIMIZE SINGLE CAR IMAGE
 POST {{baseUrl}}/api/cars/upload
 Authorization: Bearer {{adminToken}}
 Content-Type: multipart/form-data; boundary=CarImageBoundary
@@ -194,10 +199,7 @@ GET {{baseUrl}}/rss.xml
 # CUSTOMER = 2
 # CAR      = 1
 #
-# Therefore:
-#
 # conversationId = customer-2-car-1
-#
 ############################################################
 
 
@@ -233,8 +235,6 @@ Content-Type: application/json
 # EXPECTED:
 # HTTP 201
 # duplicate = false
-#
-# We now expect TWO unread customer messages.
 ############################################################
 
 ### SAVE CUSTOMER MESSAGE 2
@@ -253,15 +253,11 @@ Content-Type: application/json
 
 
 ############################################################
-# 3. CLIENT MESSAGE ID / DUPLICATE RECONCILIATION
-#
-# This repeats customer-msg-002.
+# 3. DUPLICATE MESSAGE RECONCILIATION
 #
 # EXPECTED:
 # HTTP 200
 # duplicate = true
-#
-# The database MUST NOT create message number 3 from this retry.
 ############################################################
 
 ### RETRY SAME CUSTOMER MESSAGE
@@ -281,15 +277,6 @@ Content-Type: application/json
 
 ############################################################
 # 4. CUSTOMER FETCH CHAT HISTORY
-#
-# PROVES:
-# authenticated history retrieval
-# ownership authorization
-# pagination contract
-#
-# EXPECTED:
-# HTTP 200
-# total = 2
 ############################################################
 
 ### CUSTOMER FETCH CHAT HISTORY
@@ -299,8 +286,6 @@ Authorization: Bearer {{customerToken}}
 
 ############################################################
 # 5. ADMIN FETCH CHAT HISTORY
-#
-# Admin can access any conversation.
 ############################################################
 
 ### ADMIN FETCH CHAT HISTORY
@@ -310,8 +295,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 6. HISTORY PAGINATION
-#
-# limit=1 makes pagination easy to prove.
 ############################################################
 
 ### HISTORY PAGE 1 - LIMIT 1
@@ -326,22 +309,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 7. ADMIN CONVERSATION LIST BEFORE ADMIN REPLY
-#
-# PROVES:
-# admin conversation-list endpoint
-# customer metadata
-# vehicle metadata
-# unread count
-# pagination
-#
-# EXPECTED conversation:
-#
-# conversationId = customer-2-car-1
-# messageCount   = 2
-# unreadCount    = 2
-#
-# customer.id    = 2
-# vehicle.id     = 1
 ############################################################
 
 ### GET ADMIN CONVERSATIONS BEFORE REPLY
@@ -351,12 +318,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 8. SAVE ADMIN REPLY
-#
-# IMPORTANT:
-# customerId remains 2.
-#
-# Admin's own ID is 1, but customerId identifies the CUSTOMER
-# associated with this conversation.
 ############################################################
 
 ### SAVE ADMIN MESSAGE
@@ -376,12 +337,6 @@ Content-Type: application/json
 
 ############################################################
 # 9. ADMIN CONVERSATION LIST AFTER ADMIN REPLY
-#
-# EXPECTED:
-# messageCount = 3
-# unreadCount  = 2
-#
-# Admin's outgoing message itself is already read.
 ############################################################
 
 ### ADMIN CONVERSATION LIST AFTER REPLY
@@ -405,12 +360,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 11. PERSISTED UNREAD STATE
-#
-# Run BEFORE mark-as-read.
-#
-# EXPECTED for customer-2-car-1:
-#
-# unreadCount = 2
 ############################################################
 
 ### CHECK UNREAD STATE
@@ -420,12 +369,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 12. MARK CONVERSATION AS READ
-#
-# EXPECTED first call:
-#
-# HTTP 200
-# updatedCount = 2
-# unreadCount = 0
 ############################################################
 
 ### MARK CONVERSATION AS READ
@@ -435,16 +378,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 13. MARK-AS-READ IDEMPOTENCY
-#
-# Call exactly the same endpoint again.
-#
-# EXPECTED:
-#
-# HTTP 200
-# updatedCount = 0
-# unreadCount = 0
-#
-# This proves idempotency.
 ############################################################
 
 ### MARK SAME CONVERSATION AS READ AGAIN
@@ -454,9 +387,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 14. VERIFY PERSISTED UNREAD STATE
-#
-# EXPECTED:
-# unreadCount remains 0
 ############################################################
 
 ### CHECK AFTER MARK-AS-READ
@@ -466,12 +396,6 @@ Authorization: Bearer {{adminToken}}
 
 ############################################################
 # 15. TRANSCRIPT RETENTION POLICY
-#
-# EXPECTED:
-#
-# retentionDays = 365
-# basis = message_created_at
-# automaticDeletion = false
 ############################################################
 
 ### GET RETENTION POLICY
@@ -518,15 +442,6 @@ Authorization: Bearer {{customerToken}}
 ############################################################
 # CUSTOMER OWNERSHIP AUTHORIZATION
 ############################################################
-#
-# Logged-in customer 2 tries pretending to be customer 1.
-#
-# EXPECTED:
-# HTTP 403
-# code = CHAT_ACCESS_DENIED
-#
-# This is similar to the 403 you already successfully produced.
-############################################################
 
 ### 21. CUSTOMER TRIES TO SEND FOR ANOTHER CUSTOMER
 POST {{baseUrl}}/api/chat/messages
@@ -551,6 +466,7 @@ Content-Type: application/json
 # EXPECTED:
 # HTTP 400
 # code = INVALID_MESSAGE
+
 POST {{baseUrl}}/api/chat/messages
 Authorization: Bearer {{customerToken}}
 Content-Type: application/json
@@ -569,6 +485,7 @@ Content-Type: application/json
 # EXPECTED:
 # HTTP 400
 # code = CLIENT_MESSAGE_ID_REQUIRED
+
 POST {{baseUrl}}/api/chat/messages
 Authorization: Bearer {{customerToken}}
 Content-Type: application/json
@@ -586,6 +503,7 @@ Content-Type: application/json
 # EXPECTED:
 # HTTP 404
 # code = CAR_NOT_FOUND
+
 POST {{baseUrl}}/api/chat/messages
 Authorization: Bearer {{customerToken}}
 Content-Type: application/json
@@ -604,6 +522,7 @@ Content-Type: application/json
 # EXPECTED:
 # HTTP 404
 # code = CONVERSATION_NOT_FOUND
+
 PATCH {{baseUrl}}/api/admin/chat/conversations/does-not-exist/read
 Authorization: Bearer {{adminToken}}
 
@@ -613,17 +532,6 @@ Authorization: Bearer {{adminToken}}
 ############################################################
 
 ### 26. FORCE INTENTIONAL 500 ERROR
-#
-# DEVELOPMENT ONLY
-#
-# EXPECTED:
-# HTTP 500
-#
-# Then:
-#
-# Get-Content logs\error.log -Tail 20
-############################################################
-
 GET {{baseUrl}}/api/test-error
 
 
@@ -647,3 +555,241 @@ Authorization: Bearer {{adminToken}}
 ### 29. FINAL ADMIN CONVERSATION SUMMARY
 GET {{baseUrl}}/api/admin/chat/conversations?page=1&limit=20
 Authorization: Bearer {{adminToken}}
+
+
+############################################################
+# TASK 1 — DYNAMIC VEHICLE PRICING MATRIX ENGINE
+############################################################
+
+### TASK 1.1 — GET ALL CARS WITH DEAL BADGES
+#
+# EXPECT:
+# HTTP 200
+# every vehicle should contain a deal object
+#
+GET {{baseUrl}}/api/cars
+
+
+### TASK 1.2 — GET SINGLE CAR AND RECORD VIEW
+#
+# EXPECT:
+# HTTP 200
+# deal.totalViews should increase
+#
+GET {{baseUrl}}/api/cars/1
+
+
+### TASK 1.3 — GET SINGLE CAR AGAIN
+#
+# EXPECT:
+# totalViews should increase again
+#
+GET {{baseUrl}}/api/cars/1
+
+
+### TASK 1.4 — UPDATE CAR PRICE
+#
+# EXPECT:
+# HTTP 200
+# oldPrice should contain previous price
+# deal.priceDropPercentage should be greater than 0
+# badge should normally become Price Dropped
+#
+PATCH {{baseUrl}}/api/cars/1/price
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "price": 260000000
+}
+
+
+### TASK 1.5 — GET PRICE HISTORY
+#
+# EXPECT:
+# HTTP 200
+# history should contain old_price and new_price
+#
+GET {{baseUrl}}/api/cars/1/price-history
+Authorization: Bearer {{adminToken}}
+
+
+### TASK 1.6 — GET CAR AFTER PRICE CHANGE
+#
+# EXPECT:
+# price = 260000000
+# previousPrice should contain previous value
+# priceDropPercentage should be calculated
+#
+GET {{baseUrl}}/api/cars/1
+
+
+############################################################
+# TASK 2 — BULK MULTI-IMAGE CAR BATCH UPLOADER
+############################################################
+#
+# REQUIREMENTS:
+#
+# - Admin authentication
+# - Up to 10 images
+# - 15 MB max per image
+# - JPEG / PNG / WEBP / HEIC / HEIF
+# - Sharp optimization
+# - WebP output
+# - Cloudinary upload
+# - PostgreSQL mapping
+# - sort_order
+# - bounded concurrency
+# - partial failure handling
+#
+############################################################
+
+
+### TASK 2.1 — BATCH UPLOAD TWO CAR IMAGES
+#
+# IMPORTANT:
+#
+# Change these two local paths if your image filenames differ.
+#
+# EXPECT:
+#
+# HTTP 201
+#
+# requestedCount = 2
+# successfulCount = 2
+# failedCount = 0
+# allSucceeded = true
+#
+POST {{baseUrl}}/api/cars/1/images/batch
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=CarBatchBoundary
+
+--CarBatchBoundary
+Content-Disposition: form-data; name="primaryIndex"
+
+0
+--CarBatchBoundary
+Content-Disposition: form-data; name="imageType"
+
+general
+--CarBatchBoundary
+Content-Disposition: form-data; name="images"; filename="toyota-vehicle.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota-vehicle.jpg
+--CarBatchBoundary
+Content-Disposition: form-data; name="images"; filename="toyota-hind.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota_hind.jpg
+--CarBatchBoundary--
+
+
+### TASK 2.2 — VERIFY IMAGES THROUGH CAR API
+#
+# EXPECT:
+#
+# GET succeeds
+# uploaded images should now belong to car 1
+#
+GET {{baseUrl}}/api/cars/1
+
+
+### TASK 2.3 — BATCH UPLOAD WITHOUT AUTHENTICATION
+#
+# EXPECT:
+# HTTP 401
+#
+POST {{baseUrl}}/api/cars/1/images/batch
+Content-Type: multipart/form-data; boundary=UnauthorizedBatchBoundary
+
+--UnauthorizedBatchBoundary
+Content-Disposition: form-data; name="images"; filename="toyota-vehicle.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota-vehicle.jpg
+--UnauthorizedBatchBoundary--
+
+
+### TASK 2.4 — CUSTOMER TRIES BATCH UPLOAD
+#
+# EXPECT:
+# HTTP 403
+#
+POST {{baseUrl}}/api/cars/1/images/batch
+Authorization: Bearer {{customerToken}}
+Content-Type: multipart/form-data; boundary=CustomerBatchBoundary
+
+--CustomerBatchBoundary
+Content-Disposition: form-data; name="images"; filename="toyota-vehicle.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota-vehicle.jpg
+--CustomerBatchBoundary--
+
+
+### TASK 2.5 — INVALID CAR ID
+#
+# EXPECT:
+# HTTP 404
+# code = CAR_NOT_FOUND
+#
+POST {{baseUrl}}/api/cars/99999/images/batch
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=InvalidCarBatchBoundary
+
+--InvalidCarBatchBoundary
+Content-Disposition: form-data; name="images"; filename="toyota-vehicle.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota-vehicle.jpg
+--InvalidCarBatchBoundary--
+
+############################################################
+# PRIMARY IMAGE REPLACEMENT TEST
+############################################################
+
+### REPLACE EXISTING PRIMARY IMAGE
+#
+# EXPECT:
+# HTTP 201
+#
+# The new image must be uploaded and saved successfully
+# before the existing primary is removed.
+#
+# EXPECT RESPONSE:
+# database.is_primary = true
+# database.image_type = primary
+# database.cloudinary_public_id is populated
+#
+# primaryReplacement.changed = true
+# primaryReplacement.newPrimaryImageId is populated
+# primaryReplacement.removedOldPrimaryIds contains old primary
+#
+POST {{baseUrl}}/api/cars/upload
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=PrimaryReplacementBoundary
+
+--PrimaryReplacementBoundary
+Content-Disposition: form-data; name="carId"
+
+1
+--PrimaryReplacementBoundary
+Content-Disposition: form-data; name="imageType"
+
+primary
+--PrimaryReplacementBoundary
+Content-Disposition: form-data; name="image"; filename="toyota-vehicle.jpg"
+Content-Type: image/jpeg
+
+< C:/Users/admin/Downloads/toyota-vehicle.jpg
+--PrimaryReplacementBoundary--
+
+
+### VERIFY CAR AFTER PRIMARY REPLACEMENT
+#
+# EXPECT:
+# HTTP 200
+# New primary image should be returned for car 1.
+#
+GET {{baseUrl}}/api/cars/1
