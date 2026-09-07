@@ -5,6 +5,7 @@ import {
   findUserById,
   createUser,
   updateUserProfile,
+  updateUserPassword,
 } from "../models/userModel.js";
 
 import { generateToken } from "../utils/jwt.js";
@@ -232,6 +233,99 @@ export const updateCurrentUser = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Profile update failed.",
+    });
+  }
+};
+
+/**
+ * --------------------------------------------------------------------------
+ * CHANGE CURRENT USER PASSWORD
+ * --------------------------------------------------------------------------
+ *
+ * PATCH /api/users/me/password
+ *
+ * Requirements:
+ * - User must be authenticated.
+ * - User ID comes from req.user.id.
+ * - Current password must be verified with bcrypt.compare().
+ * - Incorrect current password returns 403.
+ * - New password is hashed before storage.
+ * - Plaintext passwords are never returned or logged.
+ */
+export const changeCurrentUserPassword = async (req, res) => {
+  try {
+    // The user ID MUST come from the verified JWT.
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required.",
+      });
+    }
+
+    const { currentPassword, newPassword } = req.body || {};
+
+    // Validate request
+    if (
+      typeof currentPassword !== "string" ||
+      typeof newPassword !== "string" ||
+      !currentPassword ||
+      !newPassword
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password and new password are required.",
+      });
+    }
+
+    // Basic password validation
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 8 characters long.",
+      });
+    }
+
+    // Get the authenticated user from the database.
+    const user = await findUserById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Verify the current password.
+    const passwordMatches = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
+
+    if (!passwordMatches) {
+      return res.status(403).json({
+        success: false,
+        message: "Current password is incorrect.",
+      });
+    }
+
+    // Hash the new password before storing it.
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Store ONLY the hashed password.
+    await updateUserPassword(userId, hashedPassword);
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully.",
+    });
+  } catch (error) {
+    console.error("Password update failed:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: "Password update failed.",
     });
   }
 };

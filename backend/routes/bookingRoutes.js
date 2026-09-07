@@ -26,39 +26,61 @@ router.post('/create', async (req, res) => {
             user_phone
         } = req.body;
 
-        // Validation
+        // ----------------------------------------------------
+        // VALIDATION
+        // ----------------------------------------------------
+
         if (!user_id || !car_id || !date || !time_slot) {
             return res.status(400).json({
+                success: false,
                 error: 'Missing required fields',
-                required: ['user_id', 'car_id', 'date', 'time_slot']
+                required: [
+                    'user_id',
+                    'car_id',
+                    'date',
+                    'time_slot'
+                ]
             });
         }
 
-        // Check if time slot is valid
+        // ----------------------------------------------------
+        // VALIDATE TIME SLOT
+        // ----------------------------------------------------
+
         if (!TIME_SLOTS.includes(time_slot)) {
             return res.status(400).json({
+                success: false,
                 error: 'Invalid time slot',
                 availableSlots: TIME_SLOTS
             });
         }
 
-        // Check if already booked
-        const existingBooking = await db.collection('bookings').findOne({
-            carId: parseInt(car_id),
-            date: date,
-            timeSlot: time_slot,
-            status: { $ne: 'cancelled' }
-        });
+        // ----------------------------------------------------
+        // CHECK FOR EXISTING BOOKING
+        // ----------------------------------------------------
+
+        const existingBooking = await db
+            .collection('bookings')
+            .findOne({
+                carId: parseInt(car_id),
+                date: date,
+                timeSlot: time_slot,
+                status: { $ne: 'cancelled' }
+            });
 
         if (existingBooking) {
             return res.status(409).json({
+                success: false,
                 error: 'Time slot already booked for this car',
                 conflict: true,
                 bookedBy: existingBooking.user_name
             });
         }
 
-        // Create booking
+        // ----------------------------------------------------
+        // CREATE/PERSIST BOOKING FIRST
+        // ----------------------------------------------------
+
         const newBooking = {
             userId: parseInt(user_id),
             carId: parseInt(car_id),
@@ -73,39 +95,108 @@ router.post('/create', async (req, res) => {
             updatedAt: new Date().toISOString()
         };
 
-        const result = await db.collection('bookings').insertOne(newBooking);
+        const result = await db
+            .collection('bookings')
+            .insertOne(newBooking);
 
-        console.log(
-            "📧 Sending test drive confirmation email to:",
-            newBooking.user_email
-        );
+        // ----------------------------------------------------
+        // NOTIFICATION RESULT
+        // ----------------------------------------------------
 
-        await sendTestDriveConfirmation({
-            name: newBooking.user_name,
-            email: newBooking.user_email,
-            date: newBooking.date,
-            time: newBooking.timeSlot
-        });
+        let notification = {
+            attempted: false,
+            sent: false,
+            skipped: true,
+            reason: 'Notification was not attempted.'
+        };
 
-        console.log("✅ Confirmation email sent");
+        // ----------------------------------------------------
+        // SEND EMAIL ONLY AFTER BOOKING IS PERSISTED
+        // ----------------------------------------------------
 
-        res.status(201).json({
+        if (newBooking.user_email) {
+            notification = {
+                attempted: true,
+                sent: false,
+                skipped: false,
+                reason: 'Notification delivery is being attempted.'
+            };
+
+            try {
+                await sendTestDriveConfirmation({
+                    name: newBooking.user_name,
+                    email: newBooking.user_email,
+                    date: newBooking.date,
+                    time: newBooking.timeSlot
+                });
+
+                notification = {
+                    attempted: true,
+                    sent: true,
+                    skipped: false,
+                    reason: 'Confirmation email sent successfully.'
+                };
+
+                console.log(
+                    'Confirmation email sent to:',
+                    newBooking.user_email
+                );
+            } catch (emailError) {
+                // IMPORTANT:
+                // The booking has already been saved.
+                // Email failure must NOT make the booking fail.
+
+                console.error(
+                    'Booking confirmation email failed:',
+                    emailError.message
+                );
+
+                notification = {
+                    attempted: true,
+                    sent: false,
+                    skipped: false,
+                    reason: 'Booking succeeded but email delivery failed.'
+                };
+            }
+        } else {
+            notification = {
+                attempted: false,
+                sent: false,
+                skipped: true,
+                reason: 'No customer email address was provided.'
+            };
+        }
+
+        // ----------------------------------------------------
+        // SUCCESS RESPONSE
+        // ----------------------------------------------------
+
+        return res.status(201).json({
             success: true,
-            booking: { id: result.insertedId, ...newBooking },
-            message: `Test drive booked for ${date} at ${time_slot}`
-        });
 
+            booking: {
+                id: result.insertedId,
+                ...newBooking
+            },
+
+            message: `Test drive booked for ${date} at ${time_slot}`,
+
+            notification
+        });
 
     } catch (error) {
-        console.error('Booking error:', error);
-        res.status(500).json({
+        console.error(
+            'Booking creation failed:',
+            error.message
+        );
+
+        return res.status(500).json({
             success: false,
             error: 'Internal server error',
             message: error.message
         });
     }
 });
-
 // GET /api/bookings/check-availability - Check available slots
 router.get('/check-availability', async (req, res) => {
     try {

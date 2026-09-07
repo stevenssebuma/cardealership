@@ -1,21 +1,28 @@
 import express from "express";
 
-import { updateCurrentUser } from "../controllers/authController.js";
+import {
+  updateCurrentUser,
+  changeCurrentUserPassword,
+} from "../controllers/authController.js";
+
 import { authenticateToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-/*
-|--------------------------------------------------------------------------
-| UPDATE CURRENT USER PROFILE
-|--------------------------------------------------------------------------
-|
-| PATCH /api/users/me
-|
-| The user ID comes from the verified JWT.
-|
-*/
-
+/**
+ * PATCH /api/users/me
+ * Update name and email.
+ */
 router.patch("/me", authenticateToken, updateCurrentUser);
+
+/**
+ * PATCH /api/users/me/password
+ * Change the authenticated user's password.
+ */
+router.patch(
+  "/me/password",
+  authenticateToken,
+  changeCurrentUserPassword
+);
 
 export default router;
