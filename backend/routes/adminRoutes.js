@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticateToken, checkRole } from '../middleware/authMiddleware.js';
+import { authenticateToken, checkRole, rateLimitProtectedRoute } from '../middleware/authMiddleware.js';
 import db from '../config/database.js';
 
 const router = express.Router();
@@ -9,7 +9,7 @@ const router = express.Router();
 // ============================================
 
 // GET /api/admin/stats - Full admin statistics
-router.get('/stats', authenticateToken, checkRole(['admin']), async (req, res) => {
+router.get('/stats', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
     try {
         // Get all collections
         const cars = await db.collection('cars').find({}).toArray();
@@ -89,7 +89,7 @@ router.get('/stats', authenticateToken, checkRole(['admin']), async (req, res) =
 });
 
 // GET /api/admin/stats/summary - Quick summary
-router.get('/stats/summary', authenticateToken, checkRole(['admin']), async (req, res) => {
+router.get('/stats/summary', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
     try {
         const cars = await db.collection('cars').find({}).toArray();
         const bookings = await db.collection('bookings').find({}).toArray();
@@ -145,7 +145,7 @@ router.get('/stats/summary', authenticateToken, checkRole(['admin']), async (req
 });
 
 // GET /api/admin/users - Get all users (admin only)
-router.get('/users', authenticateToken, checkRole(['admin']), async (req, res) => {
+router.get('/users', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
     try {
         const users = await db.collection('users').find({}).toArray();
 
@@ -170,7 +170,7 @@ router.get('/users', authenticateToken, checkRole(['admin']), async (req, res) =
 });
 
 // GET /api/admin/bookings - Get all bookings (admin only)
-router.get('/bookings', authenticateToken, checkRole(['admin']), async (req, res) => {
+router.get('/bookings', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
     try {
         const bookings = await db.collection('bookings').find({}).toArray();
 
@@ -189,7 +189,7 @@ router.get('/bookings', authenticateToken, checkRole(['admin']), async (req, res
 });
 
 // GET /api/admin/cars - Get all cars (admin only)
-router.get('/cars', authenticateToken, checkRole(['admin']), async (req, res) => {
+router.get('/cars', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
     try {
         const cars = await db.collection('cars').find({}).toArray();
 

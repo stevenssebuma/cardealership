@@ -1,7 +1,10 @@
 // backend/routes/authRoutes.js
 
 import express from "express";
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import {
+  authenticateToken,
+  rateLimitProtectedRoute,
+} from "../middleware/authMiddleware.js";
 
 import { register, login, getSession } from "../controllers/authController.js";
 
@@ -34,5 +37,5 @@ router.post("/register", register);
 
 router.post("/login", login);
 
-router.get("/session", authenticateToken, getSession);
+router.get("/session", rateLimitProtectedRoute, authenticateToken, getSession);
 export default router;

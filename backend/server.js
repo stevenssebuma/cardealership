@@ -17,7 +17,11 @@ import adminRoutes from "./routes/adminRoutes.js";
 import optimizedRoutes from "./routes/optimizedRoutes.js";
 import adminMetricsRoutes from "./routes/adminMetricsRoutes.js";
 
-import { protect, adminOnly } from "./middleware/authMiddleware.js";
+import {
+  protect,
+  adminOnly,
+  rateLimitProtectedRoute,
+} from "./middleware/authMiddleware.js";
 
 import { performanceMiddleware } from "./middleware/performanceMiddleware.js";
 
@@ -451,6 +455,7 @@ ${items}
 app.post(
   "/api/chat/messages",
 
+  rateLimitProtectedRoute,
   protect,
 
   async (req, res, next) => {
@@ -686,6 +691,7 @@ app.post(
 app.get(
   "/api/chat/conversations/:conversationId/messages",
 
+  rateLimitProtectedRoute,
   protect,
 
   async (req, res, next) => {
@@ -790,6 +796,7 @@ app.get(
 app.get(
   "/api/admin/chat/conversations",
 
+  rateLimitProtectedRoute,
   protect,
   adminOnly,
 
@@ -1008,6 +1015,7 @@ app.get(
 app.patch(
   "/api/admin/chat/conversations/:conversationId/read",
 
+  rateLimitProtectedRoute,
   protect,
   adminOnly,
 
@@ -1107,6 +1115,7 @@ app.patch(
 app.get(
   "/api/admin/chat/retention-policy",
 
+  rateLimitProtectedRoute,
   protect,
   adminOnly,
 

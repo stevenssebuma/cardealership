@@ -5,7 +5,10 @@ import {
   changeCurrentUserPassword,
 } from "../controllers/authController.js";
 
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import {
+  authenticateToken,
+  rateLimitProtectedRoute,
+} from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -13,7 +16,7 @@ const router = express.Router();
  * PATCH /api/users/me
  * Update name and email.
  */
-router.patch("/me", authenticateToken, updateCurrentUser);
+router.patch("/me", rateLimitProtectedRoute, authenticateToken, updateCurrentUser);
 
 /**
  * PATCH /api/users/me/password
@@ -21,6 +24,7 @@ router.patch("/me", authenticateToken, updateCurrentUser);
  */
 router.patch(
   "/me/password",
+  rateLimitProtectedRoute,
   authenticateToken,
   changeCurrentUserPassword
 );
