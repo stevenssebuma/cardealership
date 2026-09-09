@@ -1103,6 +1103,13 @@ app.patch(
 |--------------------------------------------------------------------------
 */
 
+// Import routes (using ES module syntax)
+import bookingRoutes from './routes/bookingRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import optimizedRoutes from './routes/optimizedRoutes.js';
+import adminMetricsRoutes from './routes/adminMetricsRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import highValueRoutes from './routes/highValueRoutes.js';
 app.get(
   "/api/admin/chat/retention-policy",
 
@@ -1158,6 +1165,37 @@ app.use("/api/auth", authRoutes);
 
 app.use("/api/cars", carsRoutes);
 
+// Report routes (PDF Generator)
+app.use('/api/admin/reports', reportRoutes);
+
+// High-Value Alert routes (Spotlight System)
+app.use('/api/admin/spotlight', highValueRoutes);
+
+// ============================================
+// USER STORY 1: Financial Payment Approximation
+// ============================================
+// POST /api/finance/calculate
+// This endpoint calculates monthly loan payments
+app.post('/api/finance/calculate', (req, res) => {
+    try {
+        // STEP 1: Extract data from the request body
+        // The frontend sends a JSON object with these fields
+        const {
+            carPrice,        // Price of the car (e.g., 285,000,000 UGX)
+            downPayment,     // Down payment amount (e.g., 50,000,000 UGX)
+            interestRate,    // Annual interest rate (e.g., 12 for 12%)
+            loanTermMonths   // Loan duration in months (e.g., 60 for 5 years)
+        } = req.body;
+
+        // STEP 2: Input Validation
+        // Check if all required fields are present
+        if (carPrice === undefined || downPayment === undefined || 
+            interestRate === undefined || loanTermMonths === undefined) {
+            return res.status(400).json({
+                error: 'Missing required fields',
+                required: ['carPrice', 'downPayment', 'interestRate', 'loanTermMonths']
+            });
+        }
 /*
 |--------------------------------------------------------------------------
 | BOOKINGS
@@ -1611,6 +1649,62 @@ app.use((req, res) => {
   });
 });
 
+// ============================================
+// Health Check Endpoint
+// ============================================
+// GET /api/health
+// Simple endpoint to verify the API is running
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        message: 'Panda Motors API is running!',
+        version: '3.0.0',
+        endpoints: [
+            // Financial
+            'POST /api/finance/calculate - Calculate loan payments',
+            
+            // Dealership
+            'GET /api/dealership/location - Get dealership location',
+            'GET /api/dealership/status - Check if open',
+            
+            // Bookings
+            'POST /api/bookings/create - Book test drive',
+            'GET /api/bookings/check-availability - Check availability',
+            'GET /api/bookings/user/:user_id - Get user bookings',
+            'PUT /api/bookings/:id/cancel - Cancel booking',
+            
+            // Admin Analytics
+            'GET /api/admin/stats - Full admin statistics',
+            'GET /api/admin/stats/summary - Quick summary',
+            
+            // Performance & Optimized Queries
+            'GET /api/optimized/search - Optimized inventory search',
+            'GET /api/optimized/availability - Quick availability check',
+            'GET /api/optimized/stats - Inventory statistics',
+            'GET /api/optimized/most-searched - Most searched makes',
+            'GET /api/optimized/performance - Query performance report',
+            
+            // Admin Metrics Dashboard
+            'GET /api/admin/metrics - Full admin dashboard metrics',
+            'GET /api/admin/metrics/inventory - Inventory metrics only',
+            'GET /api/admin/metrics/bookings - Booking metrics only',
+            
+            // Reports (NEW)
+            'GET /api/admin/reports/inventory - Download PDF inventory report',
+            'GET /api/admin/reports/inventory/json - Get inventory as JSON',
+            'GET /api/admin/reports/inventory/summary - Get inventory summary',
+            
+            // High-Value Spotlight System (NEW)
+            'GET /api/admin/spotlight/alerts - View spotlight alerts',
+            'GET /api/admin/spotlight/featured - Get featured vehicles',
+            'GET /api/admin/spotlight/stats - High-value statistics',
+            'POST /api/admin/spotlight/process-all - Process all vehicles',
+            'POST /api/admin/spotlight/process/:vehicleId - Process specific vehicle',
+            
+            // Health
+            'GET /api/health - Health check'
+        ]
 /*
 |--------------------------------------------------------------------------
 | GLOBAL ERROR HANDLER
@@ -1898,6 +1992,62 @@ process.on("uncaughtException", (error) => {
 */
 
 app.listen(PORT, async () => {
+    console.log('\n========================================');
+    console.log('?? Panda Motors API Server');
+    console.log('========================================');
+    console.log(`?? Server running on: http://localhost:${PORT}`);
+    console.log(`?? Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`?? Version: 3.0.0`);
+    
+    // Initialize database
+    await initializeDatabase();
+    
+    console.log('\n?? Available Endpoints:');
+    console.log('   --- Financial ---');
+    console.log(`   POST /api/finance/calculate  - Loan calculator`);
+    
+    console.log('   --- Dealership ---');
+    console.log(`   GET  /api/dealership/location - Store location`);
+    console.log(`   GET  /api/dealership/status   - Open status`);
+    
+    console.log('   --- Test Drive Booking ---');
+    console.log(`   POST /api/bookings/create     - Book test drive with conflict logic`);
+    console.log(`   GET  /api/bookings/check-availability - Check availability`);
+    console.log(`   GET  /api/bookings/user/:user_id - Get user bookings`);
+    console.log(`   PUT  /api/bookings/:id/cancel - Cancel booking`);
+    
+    console.log('   --- Admin Analytics ---');
+    console.log(`   GET  /api/admin/stats         - Full admin statistics`);
+    console.log(`   GET  /api/admin/stats/summary - Quick summary`);
+    
+    console.log('   --- Performance & Optimized Queries ---');
+    console.log(`   GET  /api/optimized/search    - Optimized inventory search`);
+    console.log(`   GET  /api/optimized/availability - Quick availability check`);
+    console.log(`   GET  /api/optimized/stats     - Inventory statistics`);
+    console.log(`   GET  /api/optimized/most-searched - Most searched makes`);
+    console.log(`   GET  /api/optimized/performance - Query performance report`);
+    
+    console.log('   --- Admin Metrics Dashboard ---');
+    console.log(`   GET  /api/admin/metrics       - Full dashboard metrics`);
+    console.log(`   GET  /api/admin/metrics/inventory - Inventory metrics only`);
+    console.log(`   GET  /api/admin/metrics/bookings - Booking metrics only`);
+    
+    console.log('   --- Reports (NEW) ---');
+    console.log(`   GET  /api/admin/reports/inventory     - Download PDF inventory report`);
+    console.log(`   GET  /api/admin/reports/inventory/json - Get inventory as JSON`);
+    console.log(`   GET  /api/admin/reports/inventory/summary - Get inventory summary`);
+    
+    console.log('   --- High-Value Spotlight System (NEW) ---');
+    console.log(`   GET  /api/admin/spotlight/alerts      - View spotlight alerts`);
+    console.log(`   GET  /api/admin/spotlight/featured    - Get featured vehicles`);
+    console.log(`   GET  /api/admin/spotlight/stats       - High-value statistics`);
+    console.log(`   POST /api/admin/spotlight/process-all - Process all vehicles`);
+    console.log(`   POST /api/admin/spotlight/process/:id - Process specific vehicle`);
+    
+    console.log('   --- Health ---');
+    console.log(`   GET  /api/health              - Health check`);
+    console.log('========================================\n');
+});
   console.log("\n========================================");
 
   console.log("🚀 Panda Motors API Server");
