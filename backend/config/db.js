@@ -11,65 +11,63 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-
-  // Required for most hosted PostgreSQL databases, including Render.
   ssl: {
     rejectUnauthorized: false,
   },
-
   max: 5,
-  connectionTimeoutMillis: 15000,
+  connectionTimeoutMillis: 30000,
   idleTimeoutMillis: 30000,
+  keepAlive: true,
 });
 
 pool.on("connect", () => {
-  console.log("✅ PostgreSQL connection established");
+  console.log("PostgreSQL connection established");
 });
 
 pool.on("error", (error) => {
-  console.error("❌ PostgreSQL pool error:", {
-    message: error.message,
-    code: error.code,
-    severity: error.severity,
-  });
+  console.error("Unexpected PostgreSQL pool error:", error.message);
 });
 
 export async function verifyDatabaseConnection() {
-  let client;
-
   try {
-    client = await pool.connect();
-    const result = await client.query("SELECT NOW()");
-
-    console.log("✅ Database test successful:", result.rows[0]);
-
-    return { connected: true };
-  } catch (error) {
-    console.error("❌ Database connection failed:", {
-      message: error.message,
-      code: error.code,
-      errno: error.errno,
-      address: error.address,
-      port: error.port,
-    });
+    const result = await pool.query(`
+      SELECT NOW() AS current_time,
+             current_database() AS database_name
+    `);
 
     return {
-      connected: false,
-      error: {
-        code: error.code,
-        message: error.message,
-      },
+      connected: true,
+      database: result.rows[0].database_name,
+      time: result.rows[0].current_time,
     };
-  } finally {
-    client?.release();
+  } catch (error) {
+    return {
+      connected: false,
+      error,
+    };
   }
 }
 
-const db = {
-  query(text, params = []) {
-    return pool.query(text, params);
-  },
-  pool,
-};
+export async function initializeDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255),
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL DEFAULT 'user',
+      phone VARCHAR(50),
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
-export default db;
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_index
+    ON users (LOWER(email));
+  `);
+
+  console.log("Users table verified");
+}
+
+export default pool;

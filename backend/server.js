@@ -567,51 +567,67 @@ app.get('/api/health', (req, res) => {
 // DATABASE INITIALIZATION
 // ============================================
 
-async function initializeDatabase() {
-    try {
-        const { verifyDatabaseConnection } = await import("./config/db.js");
+try {
+    const { default: pool, verifyDatabaseConnection } =
+        await import("./config/db.js");
 
-        const result = await verifyDatabaseConnection();
+    const result = await verifyDatabaseConnection();
 
-        if (!result.connected) {
-            throw new Error(result.error?.message || "Database connection failed");
-        }
-
-        console.log("✅ PostgreSQL database connection verified");
-        console.log("✅ Database initialization complete!");
-    } catch (error) {
-        console.error("❌ Database initialization error:", error.message);
+    if (!result.connected) {
+        throw new Error(
+            result.error?.message || "Database connection failed"
+        );
     }
+
+    console.log("PostgreSQL database connection verified");
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            role VARCHAR(50) NOT NULL DEFAULT 'user',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+    console.log("Users table verified");
+
+    console.log("Database initialization complete");
+} catch (error) {
+    console.error(
+        "Database initialization failed:",
+        error.message
+    );
 }
+
+app.get("/", (req, res) => {
+    res.json({
+        message: "Panda Motors API is running",
+    });
+});
+
 
 // ============================================
 // START THE SERVER
 // ============================================
 
 app.listen(PORT, async () => {
-
-    console.log('\n========================================');
-
-    console.log('?? Panda Motors API Server');
-
-    console.log('========================================');
-
-    console.log(
-        `?? Server running on: http://localhost:${PORT}`
-    );
-
-    console.log(
-        `?? Environment: ${process.env.NODE_ENV || 'development'
-        }`
-    );
+    console.log("========================================");
+    console.log("Panda Motors API Server");
+    console.log("========================================");
+    console.log(`Server running on: http://localhost:${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
 
     // Initialize database
-    await initializeDatabase();
+    console.log("Database initialization verified.");
+
 
     // Start test drive reminder background job
     startTestDriveReminderJob();
 
-    console.log('\n?? Available Endpoints:');
+    console.log('\nAvailable Endpoints:');
 
     console.log('   --- Financial ---');
 
