@@ -27,8 +27,9 @@
     "otplib": "^13.5.0",
     "pg": "^8.21.0",
     "qrcode": "^1.5.4",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "socket.io": "^4.8.3",
+    "speakeasy": "^2.0.0",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.19.0"

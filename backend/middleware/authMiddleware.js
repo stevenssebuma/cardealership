@@ -2,6 +2,7 @@
 
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { SessionManager } from "../services/sessionManager.js";
 
 dotenv.config();
 
@@ -35,7 +36,7 @@ function createSlidingWindowRateLimiter({ limit, windowMs, code, message }) {
   };
 }
 
-export const authenticateToken = (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
@@ -52,6 +53,20 @@ export const authenticateToken = (req, res, next) => {
   }
 
   try {
+    // Try SessionManager verification first (new method)
+    const verifiedSession = await SessionManager.verifyToken(token);
+
+    if (verifiedSession.valid) {
+      req.user = verifiedSession.user;
+      req.session = {
+        id: verifiedSession.sessionId,
+        deviceId: verifiedSession.deviceId,
+        deviceName: verifiedSession.deviceName,
+      };
+      return next();
+    }
+
+    // If SessionManager verification fails, try JWT (fallback for legacy tokens)
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     return next();
@@ -113,12 +128,26 @@ export const checkRole = (allowedRoles) => (req, res, next) => {
   return next();
 };
 
-export const optionalAuth = (req, res, next) => {
+export const optionalAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
   if (token) {
     try {
+      // Try SessionManager verification first
+      const verifiedSession = await SessionManager.verifyToken(token);
+
+      if (verifiedSession.valid) {
+        req.user = verifiedSession.user;
+        req.session = {
+          id: verifiedSession.sessionId,
+          deviceId: verifiedSession.deviceId,
+          deviceName: verifiedSession.deviceName,
+        };
+        return next();
+      }
+
+      // Fallback to JWT
       req.user = jwt.verify(token, JWT_SECRET);
     } catch {
       req.user = null;

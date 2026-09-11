@@ -19,6 +19,8 @@ import adminMetricsRoutes from './routes/adminMetricsRoutes.js';
 import { startTestDriveReminderJob } from "./jobs/testDriveReminderJob.js";
 import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import sessionRoutes from './routes/sessionRoutes.js';
+import mfaRoutes from './routes/mfaRoutes.js';
 
 // Import performance middleware
 import { performanceMiddleware } from './middleware/performanceMiddleware.js';
@@ -114,6 +116,12 @@ app.use('/api/users', userRoutes);
 
 // Authentication routes
 app.use('/api/auth', authRoutes);
+
+// Session management routes
+app.use('/api/sessions', sessionRoutes);
+
+// Multi-Factor Authentication routes
+app.use('/api/mfa', mfaRoutes);
 
 
 // ============================================
