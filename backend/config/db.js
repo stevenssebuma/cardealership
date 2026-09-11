@@ -1,68 +1,73 @@
 import pg from "pg";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+dotenv.config();
 
 const { Pool } = pg;
 
-const envFile = process.env.NODE_ENV === "production" ? ".env.production" : ".env.development";
-
-dotenv.config({ path: envFile, quiet: true });
-dotenv.config({ path: `backend/${envFile}`, quiet: true });
-
-function useDatabaseSsl() {
-  if (process.env.DATABASE_SSL !== undefined) {
-    return process.env.DATABASE_SSL === "true";
-  }
-
-  return process.env.NODE_ENV === "production";
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is missing. Check backend/.env");
 }
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: useDatabaseSsl() ? { rejectUnauthorized: false } : false,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  max: 5,
+  connectionTimeoutMillis: 30000,
+  idleTimeoutMillis: 30000,
+  keepAlive: true,
+});
+
+pool.on("connect", () => {
+  console.log("PostgreSQL connection established");
 });
 
 pool.on("error", (error) => {
-  console.error("Database pool error", {
-    code: error.code || "DATABASE_POOL_ERROR",
-    message: "An unexpected database connection error occurred.",
-  });
+  console.error("Unexpected PostgreSQL pool error:", error.message);
 });
 
 export async function verifyDatabaseConnection() {
   try {
-    const client = await pool.connect();
-    client.release();
-    return { connected: true };
+    const result = await pool.query(`
+      SELECT NOW() AS current_time,
+             current_database() AS database_name
+    `);
+
+    return {
+      connected: true,
+      database: result.rows[0].database_name,
+      time: result.rows[0].current_time,
+    };
   } catch (error) {
     return {
       connected: false,
-      error: {
-        code: error.code || "DATABASE_CONNECTION_FAILED",
-        message: "Database connection could not be established.",
-      },
+      error,
     };
   }
 }
 
-const db = {
-  async query(text, params = []) {
-    try {
-      return await pool.query(text, params);
-    } catch (error) {
-      console.error("Database query failed", {
-        code: error.code || "DATABASE_QUERY_FAILED",
-        message: "A database query could not be completed.",
-      });
-      throw error;
-    }
-  },
+export async function initializeDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255),
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL DEFAULT 'user',
+      phone VARCHAR(50),
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
-  pool,
-};
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_index
+    ON users (LOWER(email));
+  `);
 
-export default db;
+  console.log("Users table verified");
+}
+
+export default pool;

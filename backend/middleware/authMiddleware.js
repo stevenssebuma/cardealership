@@ -1,33 +1,48 @@
 // backend/middleware/authMiddleware.js
 
-// ============================================
-// AUTHENTICATION MIDDLEWARE
-// ============================================
-// This middleware handles JWT authentication for protected routes
-
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { SessionManager } from "../services/sessionManager.js";
 
-export const authenticateToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
+dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET || "panda_motors_secret_key_2026";
 
-// ============================================
-// Middleware: Authenticate Token
-// ============================================
-// Verifies the JWT token from the Authorization header
+function createSlidingWindowRateLimiter({ limit, windowMs, code, message }) {
+  const attempts = new Map();
 
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
+  return (req, res, next) => {
+    const key = String(req.user?.id || req.ip || req.connection.remoteAddress || "anonymous");
+    const now = Date.now();
+    const history = attempts.get(key) || [];
+    const recentAttempts = history.filter((time) => now - time < windowMs);
 
+    if (recentAttempts.length >= limit) {
+      return res.status(429).json({
+        success: false,
+        error: {
+          code,
+          message,
+          status: 429,
+          details: null,
+        },
+      });
+    }
+
+    recentAttempts.push(now);
+    attempts.set(key, recentAttempts);
+
+    return next();
+  };
+}
+
+export const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({
       success: false,
-
       error: {
         code: "AUTHENTICATION_REQUIRED",
         message: "Access denied. No token provided.",
@@ -38,16 +53,27 @@ export const authenticateToken = (req, res, next) => {
   }
 
   try {
+    // Try SessionManager verification first (new method)
+    const verifiedSession = await SessionManager.verifyToken(token);
+
+    if (verifiedSession.valid) {
+      req.user = verifiedSession.user;
+      req.session = {
+        id: verifiedSession.sessionId,
+        deviceId: verifiedSession.deviceId,
+        deviceName: verifiedSession.deviceName,
+      };
+      return next();
+    }
+
+    // If SessionManager verification fails, try JWT (fallback for legacy tokens)
     const decoded = jwt.verify(token, JWT_SECRET);
-
     req.user = decoded;
-
     return next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-
         error: {
           code: "TOKEN_EXPIRED",
           message: "Token has expired. Please login again.",
@@ -59,7 +85,6 @@ export const authenticateToken = (req, res, next) => {
 
     return res.status(401).json({
       success: false,
-
       error: {
         code: "INVALID_TOKEN",
         message: "Invalid token. Access denied.",
@@ -70,23 +95,14 @@ export const authenticateToken = (req, res, next) => {
   }
 };
 
-// ============================================
-// Middleware: Check User Role
-// ============================================
-// Verifies the user has one of the allowed roles
-
 export const checkRole = (allowedRoles) => (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       success: false,
-
       error: {
         code: "AUTHENTICATION_REQUIRED",
-
         message: "Authentication required.",
-
         status: 401,
-
         details: null,
       },
     });
@@ -97,17 +113,12 @@ export const checkRole = (allowedRoles) => (req, res, next) => {
   if (!allowedRoles.includes(userRole)) {
     return res.status(403).json({
       success: false,
-
       error: {
         code: "ADMIN_ACCESS_REQUIRED",
-
         message: "Access denied. Insufficient permissions.",
-
         status: 403,
-
         details: {
           requiredRoles: allowedRoles,
-
           yourRole: userRole,
         },
       },
@@ -117,22 +128,28 @@ export const checkRole = (allowedRoles) => (req, res, next) => {
   return next();
 };
 
-// ============================================
-// Middleware: Optional Authentication
-// ============================================
-// Tries to authenticate but does not require it
-
-export const optionalAuth = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-
+export const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(" ")[1];
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      // Try SessionManager verification first
+      const verifiedSession = await SessionManager.verifyToken(token);
 
-      req.user = decoded;
-    } catch (error) {
+      if (verifiedSession.valid) {
+        req.user = verifiedSession.user;
+        req.session = {
+          id: verifiedSession.sessionId,
+          deviceId: verifiedSession.deviceId,
+          deviceName: verifiedSession.deviceName,
+        };
+        return next();
+      }
+
+      // Fallback to JWT
+      req.user = jwt.verify(token, JWT_SECRET);
+    } catch {
       req.user = null;
     }
   } else {
@@ -142,119 +159,56 @@ export const optionalAuth = (req, res, next) => {
   return next();
 };
 
-// ============================================
-// Helper: Generate JWT Token
-// ============================================
-
 export const generateToken = (user) => {
   const payload = {
     id: user.id || user._id,
-
     email: user.email,
-
     role: user.role || "user",
-
     name: user.name || user.user_name,
   };
 
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: "7d",
-  });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
 };
-
-// ============================================
-// Helper: Verify Token
-// ============================================
 
 export const verifyToken = (token) => {
   try {
     return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
+  } catch {
     return null;
   }
 };
-
-// ============================================
-// Helper: Decode Token
-// ============================================
 
 export const decodeToken = (token) => {
   try {
     return jwt.decode(token);
-  } catch (error) {
+  } catch {
     return null;
   }
 };
 
-// ============================================
-// Middleware: Rate Limiting for Auth Routes
-// ============================================
+export const rateLimitLogin = createSlidingWindowRateLimiter({
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+  code: "TOO_MANY_LOGIN_ATTEMPTS",
+  message: "Too many login attempts. Please try again in 15 minutes.",
+});
 
-const loginAttempts = new Map();
-
-export const rateLimitLogin = (req, res, next) => {
-  const ip = req.ip || req.connection.remoteAddress;
-
-  const now = Date.now();
-
-  if (!loginAttempts.has(ip)) {
-    loginAttempts.set(ip, []);
-  }
-
-  const attempts = loginAttempts.get(ip);
-
-  const recentAttempts = attempts.filter((time) => now - time < 15 * 60 * 1000);
-
-  if (recentAttempts.length >= 5) {
-    return res.status(429).json({
-      success: false,
-
-      error: {
-        code: "TOO_MANY_LOGIN_ATTEMPTS",
-
-        message: "Too many login attempts. Please try again in 15 minutes.",
-
-        status: 429,
-
-        details: null,
-      },
-    });
-  }
-
-  recentAttempts.push(now);
-
-  loginAttempts.set(ip, recentAttempts);
-
-  return next();
-};
-
-// ============================================
-// ROUTE-FRIENDLY ALIASES
-// ============================================
-//
-// server.js expects:
-//
-// protect
-// adminOnly
-//
-// protect = authenticateToken
-//
-// adminOnly = role checker restricted to admin
-//
+export const rateLimitProtectedRoute = createSlidingWindowRateLimiter({
+  limit: 120,
+  windowMs: 15 * 60 * 1000,
+  code: "TOO_MANY_REQUESTS",
+  message: "Too many authenticated requests. Please wait and try again.",
+});
 
 export const protect = authenticateToken;
-
 export const adminOnly = checkRole(["admin"]);
-
-// ============================================
-// Export all middleware
-// ============================================
 
 export default {
   authenticateToken,
   protect,
   checkRole,
   adminOnly,
+  rateLimitProtectedRoute,
   optionalAuth,
   generateToken,
   verifyToken,

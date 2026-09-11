@@ -1,6 +1,6 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/auth";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
 import { LoginPage } from "../pages/Login/LoginPage";
 import RegisterPage from "../pages/Register";
@@ -46,6 +46,7 @@ export default function App() {
             <Route path="chat" element={<AdminChatPage />} />
           </Route>
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/*" element={<HomePage />} />
         </Routes>
       </BrowserRouter>

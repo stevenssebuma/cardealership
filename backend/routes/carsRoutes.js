@@ -12,7 +12,11 @@ import { uploadCarImage } from "../controllers/carImageController.js";
 
 import { uploadSingleCarImage } from "../middleware/uploadMiddleware.js";
 
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import {
+  protect,
+  adminOnly,
+  rateLimitProtectedRoute,
+} from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -40,6 +44,7 @@ router.get("/", fetchCars);
 
 router.post(
   "/upload",
+  rateLimitProtectedRoute,
   protect,
   adminOnly,
   uploadSingleCarImage,
@@ -52,7 +57,7 @@ router.post(
 |--------------------------------------------------------------------------
 */
 
-router.post("/", protect, adminOnly, validateCarPayload, addCar);
+router.post("/", rateLimitProtectedRoute, protect, adminOnly, validateCarPayload, addCar);
 
 /*
 |--------------------------------------------------------------------------

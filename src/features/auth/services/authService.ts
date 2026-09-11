@@ -1,6 +1,6 @@
 import type { AuthSession, LoginCredentials, RegisterCredentials, VerifySessionResult } from "../types";
 import { clearStoredSession, getAuthToken, getAuthenticatedUser, getStoredSession, saveSession } from "./authStorage";
-import { verifySession as verifySessionRequest } from "./authApi";
+import { verifySession as verifySessionRequest, login as loginApi, register as registerApi } from "./authApi";
 
 export { clearStoredSession, getAuthenticatedUser, getAuthToken, getStoredSession, saveSession };
 
@@ -29,11 +29,37 @@ export async function restoreStoredSession(options: Parameters<typeof verifySess
 }
 
 export async function login(credentials: LoginCredentials): Promise<{ success: boolean; message: string }> {
-  void credentials;
-  return { success: false, message: "Authentication endpoint connection pending." };
+  try {
+    const result = await loginApi(credentials.email, credentials.password);
+    if (result.success && result.token && result.user) {
+      saveSession({ accessToken: result.token, user: result.user });
+    }
+    return {
+      success: result.success,
+      message: result.message,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Login failed",
+    };
+  }
 }
 
 export async function register(credentials: RegisterCredentials): Promise<{ success: boolean; message: string }> {
-  void credentials;
-  return { success: false, message: "Registration endpoint connection pending." };
+  try {
+    const result = await registerApi(credentials.name, credentials.email, credentials.password);
+    if (result.success && result.token && result.user) {
+      saveSession({ accessToken: result.token, user: result.user });
+    }
+    return {
+      success: result.success,
+      message: result.message,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Registration failed",
+    };
+  }
 }
