@@ -69,11 +69,14 @@ const DEAL_METRICS_SQL = `
 | GET ALL CARS
 |--------------------------------------------------------------------------
 */
-
 export const getAllCars = async () => {
   const carsQuery = `
     SELECT
       c.*,
+
+      cs.power,
+      cs.engine,
+      cs.drive,
 
       COALESCE(
         json_agg(
@@ -101,10 +104,13 @@ export const getAllCars = async () => {
 
     FROM cars c
 
+    LEFT JOIN car_specs cs
+      ON cs.car_id = c.id
+
     LEFT JOIN car_images ci
       ON ci.car_id = c.id
 
-    GROUP BY c.id
+    GROUP BY c.id, cs.power, cs.engine, cs.drive
 
     ORDER BY c.created_at DESC
 
