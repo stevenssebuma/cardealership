@@ -1,0 +1,46 @@
+name: Backend Integration Tests
+
+# Sprint 6 - Task 2: keeps the API integration suite in front of every change
+# that targets main, so broken routes or auth regressions are caught before
+# merge.
+
+on:
+  push:
+    branches:
+      - main
+      - Devine-codes
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    name: Jest + Supertest API suite
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package.json
+
+      - name: Install backend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run the API integration suite
+        env:
+          NODE_ENV: test
+          JWT_SECRET: integration-test-secret-not-for-production
+          # The suite replaces the PostgreSQL pool with an in-memory double, so
+          # no database secret is required here.
+        run: npm test

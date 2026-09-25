@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
+import { registerCustomer } from '../services/api';
+import { useAuth } from '../features/auth/hooks';
+
 const Register: React.FC = () => {
   const [formData, setFormData] = useState({
     fullName: '',
@@ -15,6 +18,7 @@ const Register: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const { login: applySession } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -46,13 +50,42 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Creates the account through POST /api/auth/register. The endpoint
+      // returns a JWT, so the new customer is signed in immediately.
+      const response = await registerCustomer({
+        name: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone
+      });
+
+      if (!response.token || !response.user) {
+        throw new Error(
+          response.message || 'Registration failed. Please try again.'
+        );
+      }
+
+      applySession({
+        accessToken: response.token,
+        user: {
+          id: String(response.user.id),
+          email: response.user.email,
+          name: response.user.name,
+          role: response.user.role
+        }
+      });
+
       setSuccess(true);
+
       setTimeout(() => {
-        navigate('/login');
-      }, 2000);
-    } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+        navigate('/profile');
+      }, 1200);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Registration failed. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -86,7 +119,7 @@ const Register: React.FC = () => {
           {success && (
             <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6 flex items-center">
               <CheckCircle className="w-5 h-5 mr-2" />
-              Registration successful! Redirecting to login...
+              Registration successful! Redirecting to your profile...
             </div>
           )}
 

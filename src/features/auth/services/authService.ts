@@ -1,4 +1,4 @@
-import type { AuthSession, LoginCredentials, RegisterCredentials, VerifySessionResult } from "../types";
+import type { AuthSession, AuthUser, LoginCredentials, RegisterCredentials, VerifySessionResult } from "../types";
 import { clearStoredSession, getAuthToken, getAuthenticatedUser, getStoredSession, saveSession } from "./authStorage";
 import { verifySession as verifySessionRequest, login as loginApi, register as registerApi } from "./authApi";
 
@@ -28,11 +28,28 @@ export async function restoreStoredSession(options: Parameters<typeof verifySess
   return session;
 }
 
-export async function login(credentials: LoginCredentials): Promise<{ success: boolean; message: string }> {
+export type AuthResult = {
+  success: boolean;
+  message: string;
+  /**
+   * Present when authentication succeeded. The caller (login/register form)
+   * applies it to the AuthProvider so protected routes unlock immediately,
+   * without waiting for a page reload or a second session request.
+   */
+  session?: AuthSession;
+};
+
+function toAuthSession(token: string, user: AuthUser): AuthSession {
+  return { accessToken: token, user: { ...user, id: String(user.id) } };
+}
+
+export async function login(credentials: LoginCredentials): Promise<AuthResult> {
   try {
     const result = await loginApi(credentials.email, credentials.password);
     if (result.success && result.token && result.user) {
-      saveSession({ accessToken: result.token, user: result.user });
+      const session = toAuthSession(result.token, result.user);
+      saveSession(session);
+      return { success: true, message: result.message, session };
     }
     return {
       success: result.success,
@@ -46,11 +63,20 @@ export async function login(credentials: LoginCredentials): Promise<{ success: b
   }
 }
 
-export async function register(credentials: RegisterCredentials): Promise<{ success: boolean; message: string }> {
+export async function register(credentials: RegisterCredentials): Promise<AuthResult> {
   try {
-    const result = await registerApi(credentials.name, credentials.email, credentials.password);
+    // The backend expects a single display name, while the registration form
+    // collects a first and last name.
+    const fullName = [credentials.firstName, credentials.lastName]
+      .map((part) => (part ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+
+    const result = await registerApi(fullName, credentials.email, credentials.password);
     if (result.success && result.token && result.user) {
-      saveSession({ accessToken: result.token, user: result.user });
+      const session = toAuthSession(result.token, result.user);
+      saveSession(session);
+      return { success: true, message: result.message, session };
     }
     return {
       success: result.success,

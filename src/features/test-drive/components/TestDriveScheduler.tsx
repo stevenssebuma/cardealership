@@ -1,4 +1,5 @@
 import { Calendar, CheckCircle2, Clock, LogIn } from "lucide-react";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ interface TestDriveSchedulerProps {
 export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
   const {
     today,
+    isAuthenticated,
     selectedVehicleId,
     setSelectedVehicleId,
     date,
@@ -27,6 +29,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
     error,
     authMessage,
     success,
+    confirmation,
     submitting,
     selectedVehicle,
     availability,
@@ -48,15 +51,36 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
           </p>
         </div>
 
+        {!isAuthenticated && (
+          <div className="mb-8 flex flex-col items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-5 text-sm md:flex-row md:items-center">
+            <LogIn className="text-primary md:mt-0.5" size={20} />
+            <p className="flex-1">
+              Test drives are reserved against a customer account. Sign in or create one and
+              you will be brought straight back to this scheduler.
+            </p>
+            <Button asChild className="bg-primary text-white hover:bg-primary/90">
+              <Link to="/login?redirect=%2F%23test-drive">Sign In To Book</Link>
+            </Button>
+          </div>
+        )}
+
         <Card className="border-border overflow-hidden">
           <CardContent className="p-6 md:p-8">
             {success ? (
               <div className="text-center py-10">
                 <CheckCircle2 className="mx-auto mb-5 text-green-600" size={64} />
                 <h4 className="text-3xl font-bold mb-3">Test Drive Request Sent</h4>
+                <p className="text-muted-foreground mb-2">
+                  {confirmation?.message ||
+                    `Your request for ${selectedVehicle?.brand} ${selectedVehicle?.name} on ${date} at ${time} has been captured.`}
+                </p>
                 <p className="text-muted-foreground mb-6">
-                  Your request for {selectedVehicle?.brand} {selectedVehicle?.name} on {date} at{" "}
-                  {time} has been captured.
+                  {selectedVehicle?.brand} {selectedVehicle?.name} on {date} at {time}
+                  {confirmation?.reference ? ` · Reference ${confirmation.reference}` : ""}
+                </p>
+                <p className="text-sm text-muted-foreground mb-6">
+                  A confirmation email is sent to your account address and our team will call you
+                  on {phone} if anything about the slot needs to change.
                 </p>
                 <Button
                   type="button"
@@ -131,6 +155,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                     state={availability}
                     vehicleSelected={Boolean(selectedVehicleId)}
                     dateSelected={Boolean(date)}
+                    onRetry={availability.retry}
                   />
                 </div>
 

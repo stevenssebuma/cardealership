@@ -16,6 +16,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     },
     category: "luxury",
     condition: "New",
+    status: "Available",
   },
   {
     id: 2,
@@ -32,6 +33,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     },
     category: "luxury",
     condition: "New",
+    status: "Available",
   },
   {
     id: 3,
@@ -48,6 +50,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     },
     category: "sport",
     condition: "New",
+    status: "Available",
   },
   {
     id: 4,
@@ -64,6 +67,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     },
     category: "sport",
     condition: "New",
+    status: "Available",
   },
   {
     id: 5,
@@ -80,6 +84,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     },
     category: "luxury",
     condition: "Used",
+    status: "Available",
   },
   {
     id: 6,
@@ -96,5 +101,6 @@ export const MOCK_VEHICLES: Vehicle[] = [
     },
     category: "luxury",
     condition: "New",
+    status: "Available",
   },
 ];

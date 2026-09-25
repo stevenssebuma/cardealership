@@ -519,14 +519,58 @@ export async function deleteCurrentUser(req, res) {
 */
 
 export const getSession = async (req, res) => {
-  return res.status(200).json({
-    success: true,
-    valid: true,
-    user: {
-      id: req.user.id,
-      name: req.user.name,
-      email: req.user.email,
-      role: req.user.role,
-    },
-  });
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        message: "User authentication is required",
+      });
+    }
+
+    // The JWT only carries id/email/role. The session check confirms the
+    // account still exists and returns the complete profile so the frontend can
+    // restore name and phone after a page reload.
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          name,
+          email,
+          role,
+          phone,
+          created_at,
+          updated_at
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        message: "Your session is no longer valid. Please sign in again.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      valid: true,
+      user: publicUser(result.rows[0]),
+    });
+  } catch (error) {
+    console.error("Get session error:", error);
+
+    return res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Session could not be verified",
+      error: error.message,
+    });
+  }
 };

@@ -1,12 +1,28 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { loadBookingAvailability } from "../services/availabilityApi";
 import type { AvailabilityState } from "../types/availability.types";
 
 const IDLE_STATE: AvailabilityState = { status: "idle", result: null };
 
-export function useBookingAvailability(vehicleId: string, date: string) {
+export type BookingAvailability = AvailabilityState & {
+  /**
+   * Re-runs the availability request for the current vehicle/date. Used when a
+   * request fails so the customer can recover without reloading the page.
+   */
+  retry: () => void;
+};
+
+export function useBookingAvailability(
+  vehicleId: string,
+  date: string,
+): BookingAvailability {
   const [state, setState] = useState<AvailabilityState>(IDLE_STATE);
+  const [attempt, setAttempt] = useState(0);
   const requestIdRef = useRef(0);
+
+  const retry = useCallback(() => {
+    setAttempt((current) => current + 1);
+  }, []);
 
   useEffect(() => {
     if (!vehicleId || !date) {
@@ -24,7 +40,7 @@ export function useBookingAvailability(vehicleId: string, date: string) {
     });
 
     return () => controller.abort();
-  }, [date, vehicleId]);
+  }, [attempt, date, vehicleId]);
 
-  return state;
+  return { ...state, retry };
 }

@@ -21,6 +21,7 @@ import userRoutes from './routes/userRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import mfaRoutes from './routes/mfaRoutes.js';
+import testDriveRoutes from './routes/testDriveRoutes.js';
 
 // Import performance middleware
 import { performanceMiddleware } from './middleware/performanceMiddleware.js';
@@ -30,6 +31,10 @@ import { createIndexes, verifyIndexes } from './config/indexes.js';
 
 // Create an Express application
 const app = express();
+
+// Export the application so the automated integration test suite
+// (Jest + Supertest) can exercise the real routes and middleware.
+export default app;
 
 // Define the port
 const PORT = process.env.PORT || 5000;
@@ -122,6 +127,10 @@ app.use('/api/sessions', sessionRoutes);
 
 // Multi-Factor Authentication routes
 app.use('/api/mfa', mfaRoutes);
+
+// Test drive booking routes (Sprint 3 integration point used by the
+// Sprint 6 automated email pipeline)
+app.use('/api/test-drives', testDriveRoutes);
 
 
 // ============================================
@@ -621,7 +630,8 @@ app.get("/", (req, res) => {
 // START THE SERVER
 // ============================================
 
-app.listen(PORT, async () => {
+// Keep a reference to the HTTP server so automated tests can close it.
+export const httpServer = app.listen(PORT, async () => {
     console.log("========================================");
     console.log("Panda Motors API Server");
     console.log("========================================");
@@ -632,8 +642,16 @@ app.listen(PORT, async () => {
     console.log("Database initialization verified.");
 
 
-    // Start test drive reminder background job
-    startTestDriveReminderJob();
+    // Start test drive reminder background job (Sprint 6).
+    // A scheduler problem must never take the API down.
+    try {
+        startTestDriveReminderJob();
+    } catch (reminderJobError) {
+        console.error(
+            "Test drive reminder job could not be started:",
+            reminderJobError.message
+        );
+    }
 
     console.log('\nAvailable Endpoints:');
 

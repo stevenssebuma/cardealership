@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import { loadBookingAvailability } from "../features/test-drive/services/availabilityApi";
 import { buildAvailabilityResult, normalizeSlots } from "../features/test-drive/utils/availability";
-import { isValidBookingDate } from "../features/test-drive/utils/bookingDate";
+import { getTodayDateInputValue, isValidBookingDate } from "../features/test-drive/utils/bookingDate";
 
 const today = new Date(2026, 7, 19);
 assert.equal(isValidBookingDate("2026-08-19", today), true);
 assert.equal(isValidBookingDate("2026-08-18", today), false);
 assert.equal(isValidBookingDate("2026-02-30", today), false);
+
+// The date input default must follow the local calendar day. Reading the UTC day
+// made the scheduler open on "yesterday" for dealerships ahead of UTC (EAT is
+// UTC+3), and its own validation then rejected that date immediately.
+const justAfterLocalMidnight = new Date(2026, 7, 20, 0, 30, 0);
+assert.equal(getTodayDateInputValue(justAfterLocalMidnight), "2026-08-20");
+assert.equal(getTodayDateInputValue(new Date(2026, 7, 20, 23, 45, 0)), "2026-08-20");
+assert.equal(isValidBookingDate(getTodayDateInputValue(justAfterLocalMidnight), justAfterLocalMidnight), true);
 const slots = normalizeSlots(["09:00", "09:00", "10:00"], ["09:00"]);
 assert.deepEqual(slots, [{ time: "09:00", available: true }, { time: "10:00", available: false }]);
 const built = buildAvailabilityResult({ vehicleId: "12", date: "2026-08-20", allSlots: ["09:00", "10:00"], availableSlots: ["09:00"], mock: false, message: "ok" });
@@ -26,4 +34,4 @@ const controller = new AbortController(); controller.abort();
 const aborted = await loadBookingAvailability("101", "2026-08-20", { mockMode: true, today, signal: controller.signal });
 assert.equal(aborted.success, false);
 if (!aborted.success) assert.equal(aborted.code, "ABORTED");
-console.log(JSON.stringify({ suite: "bookingAvailability", passed: 12, failed: 0, syntheticDataUsed: true, browserSuppliedUserId: false }, null, 2));
+console.log(JSON.stringify({ suite: "bookingAvailability", passed: 15, failed: 0, syntheticDataUsed: true, browserSuppliedUserId: false }, null, 2));

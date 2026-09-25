@@ -1,8 +1,10 @@
 // src/pages/Login.tsx
 
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { apiRequest } from "../api/client";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { login } from "../features/auth/services";
+import { useAuth } from "../features/auth/hooks";
+import { getSafeRedirectPath } from "../app/components/auth/routeAccess";
 // @ts-ignore: CSS file is imported for styling
 import "../styles/index.css";
 
@@ -11,61 +13,43 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState("");
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { login: applySession } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setError("");
-    setDebugInfo("");
     setLoading(true);
 
     try {
-      setDebugInfo("1. Trying to connect to backend...");
+      const result = await login({ email, password });
 
-      const response = await apiRequest("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      if (result.success && result.session) {
+        // Store the verified session in the AuthProvider so protected pages
+        // (profile, settings, admin) are reachable straight after signing in.
+        applySession(result.session);
 
-      setDebugInfo(`2. Response status: ${response.status}`);
+        const fallback =
+          result.session.user.role === "admin" ? "/Admin" : "/";
 
-      const data = await response.json();
-
-      setDebugInfo(`3. Response data: ${JSON.stringify(data)}`);
-
-      if (response.ok) {
-        setDebugInfo("4. Login successful!");
-
-        // Save authentication information
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-
-        // Redirect based on user role
-        setTimeout(() => {
-          if (data.user?.role === "admin") {
-            navigate("/Admin");
-          } else {
-            navigate("/");
-          }
-        }, 500);
-      } else {
-        setError(data.message || "Login failed. Please check your details.");
+        navigate(
+          getSafeRedirectPath(searchParams.get("redirect"), fallback)
+        );
+        return;
       }
-    } catch (error: any) {
-      console.error("Login error:", error);
 
-      setDebugInfo(`Error: ${error.message}`);
-
-      setError("Cannot connect to the configured API service.");
+      setError(
+        result.message || "Login failed. Please check your details."
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Cannot connect to the configured API service."
+      );
     } finally {
       setLoading(false);
     }
@@ -77,10 +61,11 @@ const Login: React.FC = () => {
 
         {/* Header */}
         <div className="login-header">
-          <h1>Welcome Back</h1>
+          <h1>Welcome Back Dear!</h1>
 
           <p>
-            Sign in to your Panda Motors account
+            Sign in to your Panda Motors account 
+            and Have the best blissfull experience ever 
           </p>
         </div>
 
@@ -88,13 +73,6 @@ const Login: React.FC = () => {
         {error && (
           <div className="login-error">
             {error}
-          </div>
-        )}
-
-        {/* Debug Information */}
-        {debugInfo && (
-          <div className="login-debug">
-            {debugInfo}
           </div>
         )}
 
@@ -147,7 +125,7 @@ const Login: React.FC = () => {
 
         {/* Register Link */}
         <div className="login-register">
-          <span>Don't have an account?</span>{" "}
+          <span>Don't have an account? Create one</span>{" "}
           <Link to="/register">
             Register
           </Link>

@@ -61,12 +61,17 @@ export function BookingHistory() {
     );
   }
 
+  // `strict` is off in tsconfig.check.json, so a boolean discriminant only
+  // narrows through an explicit equality check rather than a truthiness test.
+  const failureMessage =
+    result && result.success === false ? result.message : null;
+
   if (!result || !result.success) {
     return (
       <Card className="profile-settings-wide">
         <CardContent className="booking-state booking-error">
           <AlertCircle size={22} />
-          <p>{result?.message ?? "Booking history is unavailable."}</p>
+          <p>{failureMessage ?? "Booking history is unavailable."}</p>
           <Button variant="outline" onClick={() => void refresh()}>
             <RefreshCw size={16} />
             Retry

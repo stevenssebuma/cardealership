@@ -41,6 +41,22 @@
   color: rgb(185 28 28);
 }
 
+.availability-message p {
+  margin: 0;
+}
+
+.availability-retry {
+  margin-left: auto;
+  flex-shrink: 0;
+  border-color: currentColor;
+  color: inherit;
+  background: rgb(255 255 255 / 0.7);
+}
+
+.availability-retry:hover {
+  background: rgb(255 255 255);
+}
+
 .availability-mock-note {
   color: rgb(146 64 14);
   font-size: 0.75rem;

@@ -26,7 +26,7 @@ export function useBookingHistory() {
     setResult(response);
     setIsLoading(false);
 
-    if (!response.success && response.code === "UNAUTHORIZED") {
+    if (response.success === false && response.code === "UNAUTHORIZED") {
       logout();
     }
 

@@ -10,8 +10,10 @@ const result = await loadBookingHistory(
   { mockMode: true },
 );
 
+// Checked before the assert below, which narrows `success` to `true` through its
+// `asserts` signature and would make this guard unreachable to the type checker.
+if (result.success === false) throw new Error(result.message);
 assert.equal(result.success, true);
-if (!result.success) throw new Error(result.message);
 
 assert.equal(result.bookings.length, 3);
 const groups = groupBookingHistory(result.bookings);

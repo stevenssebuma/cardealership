@@ -143,10 +143,80 @@ Validation commands:
 
 ```text
 npm run test:api-config
-VITE_API_BASE_URL=https://approved-production-api.example.com npm run build
+
+# Vite loads .env / .env.production automatically, so the override is not tied to
+# any particular shell. Add the approved origin to an ignored environment file:
+#   VITE_API_BASE_URL=https://approved-production-api.example.com
+npm run build
+
+# One-off overrides, if you would rather not create an environment file:
+#   PowerShell:  $env:VITE_API_BASE_URL="https://approved-production-api.example.com"; npm run build
+#   bash / zsh:  VITE_API_BASE_URL=https://approved-production-api.example.com npm run build
 ```
 
 Project demonstration:
 
 https://youtu.be/HNtln75HTEg
-"# Updated" 
+
+---
+
+## Sprint 6 Automated Test Drive Email Pipeline
+
+The test drive booking lifecycle now sends transactional email automatically:
+
+- An immediate confirmation receipt is sent from `POST /api/bookings/create` through `backend/services/emailService.js`.
+- A background checker (`backend/jobs/testDriveReminderJob.js`) emails a reminder when an appointment is approximately 24 hours away and marks the booking with `reminderSent` so a reminder is never duplicated.
+- Both sends are non-blocking: a booking is always saved even when email delivery fails, and the pipeline is skipped safely (never throwing) when no provider is configured.
+
+Provider resolution order (see `backend/services/emailService.js` and `backend/config/email.js`):
+
+```text
+EMAIL_PROVIDER=nodemailer with EMAIL_HOST/EMAIL_PORT/EMAIL_USER/EMAIL_PASSWORD/EMAIL_FROM
+  -> fall back to the Ethereal test account (ETHEREAL_USER / ETHEREAL_PASSWORD)
+  -> otherwise skip the send safely
+```
+
+Reminder checker settings (`backend/.env`):
+
+```text
+TEST_DRIVE_REMINDER_ENABLED=true
+TEST_DRIVE_REMINDER_INTERVAL_MINUTES=60
+TEST_DRIVE_REMINDER_WINDOW_HOURS=24
+TEST_DRIVE_REMINDER_DRY_RUN=false
+```
+
+The window is deliberately one hour wide on either side of the target (23h to 25h) so an hourly run can never step over an appointment.
+
+Manual validation:
+
+```text
+cd backend
+npm run test:test-drive-emails
+```
+
+### Sprint 6 API Integration Testing Suite
+
+Backend integration tests use Jest + Supertest against the real Express application (routes, middleware and JWT signing) while the PostgreSQL pool is replaced with an in-memory double, so the suite runs without a live database or email provider.
+
+Covered scenarios:
+
+- Registering a new user succeeds and never returns the password hash.
+- Registration validation responses (`400`, `409`) stay intact.
+- Logging in returns a signed JWT with the expected claims.
+- Invalid credentials are rejected with `401`.
+- Admin routes fail without a token (`401`), with an invalid token (`401`) and with a customer token (`403`), and succeed with an admin token.
+- Profile endpoints used by the profile page (`GET`/`PATCH /api/users/me`) require a valid session.
+- Booking a test drive triggers exactly one confirmation email.
+- The reminder sweep sends exactly one reminder 24 hours before an appointment and never duplicates it.
+
+Commands:
+
+```text
+cd backend
+npm test                      # full suite
+npm run test:auth-integration # auth, admin protection, profile routes
+npm run test:email-integration# booking confirmation + reminder pipeline
+```
+
+The suite also runs in CI through `.github/workflows/backend-integration-tests.yml` on pull requests targeting `main`.
+

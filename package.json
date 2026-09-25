@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "typecheck": "tsc -p tsconfig.check.json",
     "test:auth-storage": "tsx src/tests/authStorage.manual.ts",
     "test:auth-service": "tsx src/tests/authService.manual.ts",
     "test:auth": "npm run test:auth-storage && npm run test:auth-service && npm run test:auth-bootstrap",
@@ -24,6 +25,8 @@
     "test:booking-history": "tsx src/tests/bookingHistory.manual.ts",
     "test:booking-availability": "tsx src/tests/bookingAvailability.manual.ts",
     "test:availability-selection": "tsx src/tests/availabilitySelection.manual.ts",
+    "test:vehicle-selection": "tsx src/tests/vehicleSelection.manual.ts",
+    "test:test-drive-booking": "tsx src/tests/testDriveBooking.manual.ts",
     "test:admin-chat-state": "tsx src/tests/adminChatState.manual.ts",
     "test:unread-chat-badge": "tsx src/tests/unreadChatBadge.manual.ts",
     "test:admin-chat": "npm run test:admin-chat-state && npm run test:admin-chat-socket && npm run test:admin-chat-api && npm run test:admin-chat-badge && npm run test:admin-chat-security && npm run test:admin-chat-accessibility && npm run test:chat-interaction && npm run test:chat-persistence",
@@ -40,9 +43,9 @@
     "test:admin-chat-badge": "npm run test:unread-chat-badge",
     "test:admin-chat-security": "npm run test:chat-security",
     "test:admin-chat-accessibility": "tsx src/tests/adminChatAccessibility.manual.ts",
-    "test:regression": "npm run test:auth && npm run test:protected-route && npm run test:auth-persistence && npm run test:profile && npm run test:password && npm run test:booking-history && npm run test:booking-availability && npm run test:availability-selection && npm run test:vehicle-filters && npm run test:api-config",
+    "test:regression": "npm run test:auth && npm run test:protected-route && npm run test:auth-persistence && npm run test:profile && npm run test:password && npm run test:booking-history && npm run test:booking-availability && npm run test:availability-selection && npm run test:vehicle-selection && npm run test:test-drive-booking && npm run test:vehicle-filters && npm run test:api-config",
     "test:sprint7": "npm run test:admin-chat && npm run test:regression",
-    "test:sprint7-release": "npm run test:sprint7 && VITE_API_BASE_URL=https://approved-production-api.example.com VITE_PROFILE_MOCK_MODE=false VITE_AVAILABILITY_MOCK_MODE=false VITE_CHAT_GATEWAY_URL= VITE_CHAT_TRANSPORT=mock VITE_CHAT_MOCK_MODE=false VITE_CHAT_API_MOCK_MODE=false npm run build"
+    "test:sprint7-release": "npm run test:sprint7 && node -e \"const { execSync } = require('node:child_process'); execSync('npm run build', { stdio: 'inherit', env: { ...process.env, VITE_API_BASE_URL: 'https://approved-production-api.example.com', VITE_PROFILE_MOCK_MODE: 'false', VITE_AVAILABILITY_MOCK_MODE: 'false', VITE_CHAT_GATEWAY_URL: '', VITE_CHAT_TRANSPORT: 'mock', VITE_CHAT_MOCK_MODE: 'false', VITE_CHAT_API_MOCK_MODE: 'false' } });\""
   },
   "dependencies": {
     "@radix-ui/react-accordion": "1.2.3",
@@ -102,6 +105,7 @@
     "react-dom": "^18.3.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.1",
+    "typescript": "^5.9.3",
     "vite": "^6.4.3"
   },
   "peerDependencies": {

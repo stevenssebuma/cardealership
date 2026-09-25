@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import type { AdminVehicle } from "../../../types/vehicle";
 import {
   Table,
   TableBody,

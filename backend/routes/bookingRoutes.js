@@ -1,6 +1,10 @@
 import express from 'express';
 import db from '../config/database.js';
 import { sendTestDriveConfirmation } from '../services/emailService.js';
+import {
+    authenticateToken,
+    rateLimitProtectedRoute,
+} from '../middleware/authMiddleware.js';
 
 
 const router = express.Router();
@@ -123,24 +127,38 @@ router.post('/create', async (req, res) => {
             };
 
             try {
-                await sendTestDriveConfirmation({
-                    name: newBooking.user_name,
-                    email: newBooking.user_email,
-                    date: newBooking.date,
-                    time: newBooking.timeSlot
+                // Sprint 6: the transactional email module handles provider
+                // resolution and never throws, so a failed email can never
+                // make an already saved booking fail.
+                const delivery = await sendTestDriveConfirmation({
+                    customerName: newBooking.user_name,
+                    customerEmail: newBooking.user_email,
+                    vehicleName: newBooking.carModel,
+                    vehicleId: newBooking.carId,
+                    appointmentDate: newBooking.date,
+                    appointmentTime: newBooking.timeSlot,
+                    reference: `TD-${result.insertedId}`
                 });
 
                 notification = {
-                    attempted: true,
-                    sent: true,
-                    skipped: false,
-                    reason: 'Confirmation email sent successfully.'
+                    attempted: delivery.attempted === true,
+                    sent: delivery.sent === true,
+                    skipped: delivery.skipped === true,
+                    provider: delivery.provider,
+                    reason: delivery.reason
                 };
 
-                console.log(
-                    'Confirmation email sent to:',
-                    newBooking.user_email
-                );
+                if (delivery.sent) {
+                    console.log(
+                        'Confirmation email sent to:',
+                        newBooking.user_email
+                    );
+                } else {
+                    console.warn(
+                        'Confirmation email was not sent:',
+                        delivery.reason
+                    );
+                }
             } catch (emailError) {
                 // IMPORTANT:
                 // The booking has already been saved.
@@ -241,6 +259,46 @@ router.get('/check-availability', async (req, res) => {
         });
     }
 });
+
+// GET /api/bookings/me - Get the authenticated user's bookings
+// Used by the booking history panel on the profile settings page.
+router.get(
+    '/me',
+    rateLimitProtectedRoute,
+    authenticateToken,
+    async (req, res) => {
+        try {
+            const userId = parseInt(req.user?.id, 10);
+
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    error: 'User authentication is required'
+                });
+            }
+
+            const userBookings = await db.collection('bookings')
+                .find({ userId: userId })
+                .sort({ date: 1 })
+                .toArray();
+
+            res.json({
+                success: true,
+                userId,
+                total: userBookings.length,
+                bookings: userBookings
+            });
+
+        } catch (error) {
+            console.error('Current user bookings error:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Internal server error',
+                message: error.message
+            });
+        }
+    }
+);
 
 // GET /api/bookings/user/:user_id - Get user's bookings
 router.get('/user/:user_id', async (req, res) => {
