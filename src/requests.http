@@ -6,7 +6,7 @@
 @baseUrl = http://localhost:5500
 
 # Replace these after running the login requests below.
-@adminToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBjYXJzLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4ODI3MDE4MCwiZXhwIjoxNzg4ODc0OTgwfQ.pt7Ral3xm7GfQL22WGpXzZWz3_TY6z5ynBT75SqlnKE
+@adminToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJhZG1pbkBjYXJzLmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5MDE0NjI0NiwiZXhwIjoxNzkwNzUxMDQ2fQ.n35HdIcCc9c555zixe9V0IdBrNVocFDkvBTjwNT4uNo
 @customerToken =eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjdXN0b21lcjFAY2Fycy5jb20iLCJyb2xlIjoidXNlciIsImlhdCI6MTc4ODI3MDI0NCwiZXhwIjoxNzg4ODc1MDQ0fQ.1qYo1CIuQkdYnjyvB1vRmu8hXdk-RZGo1_EGLqfZmkc
 
 
@@ -135,9 +135,12 @@ Content-Type: application/json
 Authorization: Bearer {{adminToken}}
 
 {
+  "name": "Toyota Pathfinder",
+  "brand": "Toyota",
+  "type": "SUV",
+  "category": "Used",
   "vin": "123ABC",
-  "make": "Toyota",
-  "model": "Harrier",
+  "model": "Pathfinder",
   "year": 2022,
   "price": 45000000,
   "mileage": 5000
@@ -177,7 +180,7 @@ primary
 Content-Disposition: form-data; name="image"; filename="toyota-car.jpg"
 Content-Type: image/jpeg
 
-< C:/Users/admin/Downloads/toyota-vehicle.jpg
+< C:/Users/admin/Downloads/new_car.jpg
 --CarImageBoundary--
 
 

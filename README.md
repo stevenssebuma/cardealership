@@ -1,14 +1,14 @@
+﻿# Car Dealership Website
 
-  # Car Dealership Website
+This is a code bundle for Car Dealership Website. The original project is available at https://www.figma.com/design/NPsA6njEcspPFrARnNwvCj/Car-Dealership-Website.
 
-  This is a code bundle for Car Dealership Website. The original project is available at https://www.figma.com/design/NPsA6njEcspPFrARnNwvCj/Car-Dealership-Website.
+## Running the code
 
-  ## Running the code
+Run `npm i` to install the dependencies.
 
-  Run `npm i` to install the dependencies.
+Run `npm run dev` to start the development server.
 
-  Run `npm run dev` to start the development server.
-  ---
+---
 
 ---
 
@@ -84,16 +84,91 @@ CLEANUP_STATUSES=Draft,Deleted
 
 Real storage deletion remains intentionally disabled. Before enabling destructive cleanup, the team must confirm the production storage provider, object identifier strategy, bucket or folder rules, credentials management, storage-versus-database deletion policy, scheduler ownership, cron schedule, production dry-run policy, and approval owner.
 
-The backend exposes GET /api/auth/session. The endpoint requires Authorization: Bearer <access-token>, verifies the JWT, confirms that the referenced PostgreSQL user still exists, and returns the verified user. Missing, invalid, expired, and rejected sessions return unauthorized responses and cause the frontend to clear stored authentication data. Live deployment validation still requires securely configured DATABASE_URL and JWT_SECRET values.
+**## Car Image Upload API**
 
-### Routing safety contract
+The backend provides a protected endpoint for uploading a car image.
 
-```text
+**### Endpoint**
+
+\`POST /api/cars/upload\`
+
+**### Authentication**
+
+\`Authorization: Bearer \<access-token>\`
+
+The authenticated user must have the admin role.
+
+**### Request**
+
+The endpoint accepts a \`multipart/form-data\` request with:
+
+\- \`carId\` — ID of the existing car
+
+\- \`imageType\` — image type, such as \`primary\`
+
+\- \`image\` — image file
+
+Example:
+
+\`\`\`text
+POST /api/cars/upload
+Authorization: Bearer \<admin-access-token>
+Content-Type: multipart/form-data
+\`\`\`
+
+The image is processed and optimized by the backend before being uploaded to Cloudinary.
+
+**### Response**
+
+A successful upload returns HTTP \`201\` and includes the uploaded image information and secure Cloudinary image URL.
+
+Example:
+
+\`\`\`json
+{
+"success": true,
+"message": "Image uploaded successfully",
+"image": {
+"imageUrl": "https://res.cloudinary.com/..."
+}
+}
+\`\`\`
+
+**### Upload Flow**
+
+\`\`\`text
+Authenticated admin
+↓
+POST /api/cars/upload
+↓
+Verify carId
+↓
+Process and optimize image
+↓
+Upload to Cloudinary
+↓
+Save image information in car_images
+↓
+Return secure image URL
+\`\`\`
+
+The endpoint has been tested successfully through \`src/requests.http\`.
+
+The backend exposes GET /api/auth/session. The endpoint requires Authorization: Bearer \<access-token>, verifies the JWT, confirms that the referenced PostgreSQL user still exists, and returns the verified user. Missing, invalid, expired, and rejected sessions return unauthorized responses and cause the frontend to clear stored authentication data. Live deployment validation still requires securely configured DATABASE_URL and JWT_SECRET values.
+
+**### Routing safety contract**
+
+\`\`\`text
 Authentication unresolved -> render a bootstrap/loading state
+
 Authentication ready and verified -> render protected content
+
 Authentication ready and unauthenticated -> redirect to login
+
 Authenticated user visiting login -> redirect to the intended destination or dashboard
-```
+\`\`\`
+
+The active router remains \`src/app/App.tsx\`. The unused \`src/app/routes.tsx\` configuration must not become a second active router during authentication implementation.
 
 The active router remains `src/app/App.tsx`. The unused `src/app/routes.tsx` configuration must not become a second active router during authentication implementation.
 
@@ -175,7 +250,6 @@ Production validation confirmed:
 - No production source maps are generated.
 - No test runner or React refresh tooling enters the production bundle.
 - `/`, `/login`, `/register`, and `/Admin` are served by the local production preview.
-
 
 ## Production Deployment Handoff
 

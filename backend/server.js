@@ -1,8 +1,8 @@
 ﻿// backend/server.js
-
+import dotenv from "dotenv";
+dotenv.config();
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import winston from "winston";
 import fs from "fs";
 import path from "path";
@@ -25,8 +25,6 @@ import db from "./config/db.js";
 const __filename = fileURLToPath(import.meta.url);
 
 const __dirname = path.dirname(__filename);
-
-dotenv.config();
 
 const app = express();
 

@@ -8,7 +8,10 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
-const JWT_SECRET = process.env.JWT_SECRET || "panda_motors_secret_key_2026";
+dotenv.config();
+
+const getJwtSecret = () =>
+  process.env.JWT_SECRET || "panda_motors_secret_key_2026";
 
 // ============================================
 // Middleware: Authenticate Token
@@ -34,7 +37,7 @@ export const authenticateToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, getJwtSecret());
 
     req.user = decoded;
 
@@ -125,7 +128,7 @@ export const optionalAuth = (req, res, next) => {
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, JWT_SECRET);
+      const decoded = jwt.verify(token, getJwtSecret());
 
       req.user = decoded;
     } catch (error) {
@@ -153,7 +156,7 @@ export const generateToken = (user) => {
     name: user.name || user.user_name,
   };
 
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJwtSecret(), {
     expiresIn: "7d",
   });
 };
@@ -164,7 +167,7 @@ export const generateToken = (user) => {
 
 export const verifyToken = (token) => {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, getJwtSecret());
   } catch (error) {
     return null;
   }

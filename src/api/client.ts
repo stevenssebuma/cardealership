@@ -5,19 +5,32 @@ export function buildApiUrl(path: string): string {
   return `${getApiBaseUrl()}${normalizedPath}`;
 }
 
-export function createBearerHeaders(token: string, headers: HeadersInit = {}): Headers {
+export function createBearerHeaders(
+  token: string,
+  headers: HeadersInit = {},
+): Headers {
   const result = new Headers(headers);
   result.set("Authorization", `Bearer ${token}`);
   result.set("Accept", "application/json");
   return result;
 }
 
-export async function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
+export async function apiRequest(
+  path: string,
+  options: RequestInit = {},
+): Promise<Response> {
   return fetch(buildApiUrl(path), options);
 }
 
-export async function authenticatedApiRequest(path: string, token: string, options: RequestInit = {}): Promise<Response> {
-  return apiRequest(path, { ...options, headers: createBearerHeaders(token, options.headers) });
+export async function authenticatedApiRequest(
+  path: string,
+  token: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  return apiRequest(path, {
+    ...options,
+    headers: createBearerHeaders(token, options.headers),
+  });
 }
 
 export type AuthenticatedApiFetcher = (
