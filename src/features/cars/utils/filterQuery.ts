@@ -8,7 +8,8 @@ export type VehicleFilterQuery = {
 
 export function parseVehicleFilterQuery(search: string): VehicleFilterQuery {
   const params = new URLSearchParams(search);
-  const rawPrice = Number(params.get("maxPrice"));
+  const priceParameter = params.get("maxPrice");
+  const rawPrice = priceParameter === null ? MAX_PRICE_RANGE : Number(priceParameter);
   return {
     brand: params.get("brand")?.trim() ?? "",
     year: params.get("year")?.trim() ?? "",

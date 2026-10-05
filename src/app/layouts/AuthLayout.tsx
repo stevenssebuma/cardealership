@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Outlet, Link } from "react-router";
-import { HeaderBrand } from "@/components/common/Header/Header";
+import { HeaderBrand } from "../../components/common/Header/Header";
 
 /**
  * Shared chrome for the public account screens (sign in / register).

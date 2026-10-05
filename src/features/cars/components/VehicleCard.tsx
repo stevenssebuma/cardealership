@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent } from "../../../components/ui/card";
 import { formatUGX } from "../utils/formatUGX";
 import type { Vehicle } from "../types";
 
@@ -10,7 +10,7 @@ interface VehicleCardProps {
 
 export function VehicleCard({ vehicle }: VehicleCardProps) {
   return (
-    <Card className="bg-card border-border overflow-hidden group cursor-pointer transition-all duration-300 hover:border-primary/50 hover:shadow-lg w-full">
+    <Card className="flex h-full w-full cursor-pointer flex-col overflow-hidden border-border bg-card transition-all duration-300 group hover:border-primary/50 hover:shadow-lg">
       
       {/* Image */}
       <div className="relative h-52 sm:h-60 md:h-64 overflow-hidden">
@@ -49,7 +49,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
       </div>
 
       {/* Content */}
-      <CardContent className="p-4 sm:p-5 md:p-6">
+      <CardContent className="flex flex-1 flex-col p-4 sm:p-5 md:p-6">
         
         {/* Vehicle information */}
         <div className="mb-4">
@@ -67,7 +67,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
         </div>
 
         {/* Specifications */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4 border-t border-border">
+        <div className="mt-auto grid grid-cols-3 gap-2 border-t border-border pt-4 sm:gap-4">
           
           <div className="min-w-0">
             <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
@@ -100,9 +100,11 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
 
         {/* View details button */}
         <Button
+          type="button"
+          onClick={() => document.getElementById("test-drive")?.scrollIntoView({ behavior: "smooth" })}
           className="w-full mt-5 sm:mt-6 bg-primary hover:bg-primary/90 text-white font-semibold text-sm sm:text-base h-11 sm:h-12"
         >
-          VIEW DETAILS
+          SCHEDULE A TEST DRIVE
           <ChevronRight className="ml-2" size={18} />
         </Button>
 

@@ -38,14 +38,14 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
   } = useTestDrive(vehicles);
 
   return (
-    <section id="test-drive" className="py-24 px-6 lg:px-8 bg-background">
+    <section id="test-drive" className="bg-background px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <p className="text-primary text-sm font-bold tracking-[0.3em] mb-4 uppercase">
             Book Your Slot
           </p>
-          <h3 className="text-5xl md:text-6xl font-bold mb-4">SCHEDULE A TEST DRIVE</h3>
-          <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
+          <h3 className="mb-4 text-3xl font-bold sm:text-4xl md:text-5xl">SCHEDULE A TEST DRIVE</h3>
+          <p className="mx-auto max-w-3xl text-base text-muted-foreground sm:text-lg">
             Pick your preferred vehicle, choose a valid date and time, and our team will help
             reserve your showroom test drive.
           </p>
@@ -110,6 +110,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                     <Label htmlFor="vehicle">Vehicle</Label>
                     <select
                       id="vehicle"
+                      required
                       value={selectedVehicleId}
                       onChange={(event) => setSelectedVehicleId(event.target.value)}
                       className="h-12 w-full rounded-lg border border-border bg-background px-4 text-sm"
@@ -127,6 +128,8 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                     <Input
                       id="phone"
                       type="tel"
+                      autoComplete="tel"
+                      required
                       value={phone}
                       onChange={(event) => setPhone(event.target.value)}
                       placeholder="+256 700 000 000"
@@ -143,6 +146,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                       id="date"
                       type="date"
                       min={today}
+                      required
                       value={date}
                       onChange={(event) => setDate(event.target.value)}
                       className="h-12"

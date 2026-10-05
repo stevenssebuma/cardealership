@@ -3,21 +3,13 @@ import {
   CalendarClock,
   RefreshCw,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+} from "../../../components/ui/card";
 import { useBookingHistory } from "../hooks/useBookingHistory";
 import { groupBookingHistory } from "../utils/bookingHistory";
 import type { BookingHistoryItem } from "../types";
@@ -37,9 +29,9 @@ function BookingGroup({ items }: { items: BookingHistoryItem[] }) {
               <strong>{booking.vehicleName}</strong>
               <p>{booking.date} at {booking.time}</p>
             </div>
-            <Badge className={`booking-${booking.status}`}>
+            <span className={`booking-${booking.status}`}>
               {booking.status}
-            </Badge>
+            </span>
           </CardContent>
         </Card>
       ))}
@@ -49,13 +41,14 @@ function BookingGroup({ items }: { items: BookingHistoryItem[] }) {
 
 export function BookingHistory() {
   const { isLoading, result, refresh } = useBookingHistory();
+  const [activeTab, setActiveTab] = useState<"upcoming" | "completed" | "cancelled">("upcoming");
 
   if (isLoading) {
     return (
       <Card className="profile-settings-wide">
         <CardContent className="booking-loading">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-28 w-full" />
+          <div className="h-8 w-64 animate-pulse rounded-md bg-muted" />
+          <div className="h-28 w-full animate-pulse rounded-md bg-muted" />
         </CardContent>
       </Card>
     );
@@ -66,16 +59,20 @@ export function BookingHistory() {
   const failureMessage =
     result && result.success === false ? result.message : null;
 
-  if (!result || !result.success) {
+  if (!result || result.success === false) {
     return (
       <Card className="profile-settings-wide">
         <CardContent className="booking-state booking-error">
           <AlertCircle size={22} />
           <p>{failureMessage ?? "Booking history is unavailable."}</p>
-          <Button variant="outline" onClick={() => void refresh()}>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            onClick={() => void refresh()}
+          >
             <RefreshCw size={16} />
             Retry
-          </Button>
+          </button>
         </CardContent>
       </Card>
     );
@@ -97,28 +94,22 @@ export function BookingHistory() {
         )}
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="upcoming">
-          <TabsList>
-            <TabsTrigger value="upcoming">
-              Upcoming ({groups.upcoming.length})
-            </TabsTrigger>
-            <TabsTrigger value="completed">
-              Completed ({groups.completed.length})
-            </TabsTrigger>
-            <TabsTrigger value="cancelled">
-              Cancelled ({groups.cancelled.length})
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="upcoming">
-            <BookingGroup items={groups.upcoming} />
-          </TabsContent>
-          <TabsContent value="completed">
-            <BookingGroup items={groups.completed} />
-          </TabsContent>
-          <TabsContent value="cancelled">
-            <BookingGroup items={groups.cancelled} />
-          </TabsContent>
-        </Tabs>
+        <div role="tablist" aria-label="Booking history">
+          {(["upcoming", "completed", "cancelled"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab[0].toUpperCase() + tab.slice(1)} ({groups[tab].length})
+            </button>
+          ))}
+        </div>
+        <div role="tabpanel">
+          <BookingGroup items={groups[activeTab]} />
+        </div>
       </CardContent>
     </Card>
   );

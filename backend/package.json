@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build": "vite build",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js",
     "test:auth-integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js tests/auth.integration.test.js",
