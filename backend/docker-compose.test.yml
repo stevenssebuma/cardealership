@@ -1,0 +1,23 @@
+name: panda-motors-api-tests
+
+services:
+  postgres:
+    container_name: panda-motors-postgres-test
+    image: postgres:18-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.test
+    ports:
+      - "5434:5432"
+    volumes:
+      - panda_motors_test_pgdata:/var/lib/postgresql
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U panda_motors_test -d panda_motors_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  panda_motors_test_pgdata:
+    name: panda_motors_test_pgdata

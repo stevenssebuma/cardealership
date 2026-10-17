@@ -1,28 +1,62 @@
 import pg from "pg";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const { Pool } = pg;
+const isTest = process.env.NODE_ENV === "test";
 
-const envFile = process.env.NODE_ENV === "production" ? ".env.production" : ".env.development";
+if (!isTest) {
+  const envFile =
+    process.env.NODE_ENV === "production"
+      ? ".env.production"
+      : ".env.development";
+  dotenv.config({ path: envFile, quiet: true });
+  dotenv.config({ path: `backend/${envFile}`, quiet: true });
+}
 
-dotenv.config({ path: envFile, quiet: true });
-dotenv.config({ path: `backend/${envFile}`, quiet: true });
+function getConnectionString() {
+  if (!isTest) return process.env.DATABASE_URL;
 
-function useDatabaseSsl() {
-  if (process.env.DATABASE_SSL !== undefined) {
-    return process.env.DATABASE_SSL === "true";
+  const testUrl = process.env.TEST_DATABASE_URL;
+  if (!testUrl) {
+    throw new Error(
+      "TEST_DATABASE_URL is required when NODE_ENV=test. Refusing to use DATABASE_URL for API tests.",
+    );
   }
 
-  return process.env.NODE_ENV === "production";
+  let databaseName;
+  try {
+    databaseName = new URL(testUrl).pathname.replace(/^\//, "");
+  } catch {
+    throw new Error(
+      "TEST_DATABASE_URL must be a valid PostgreSQL connection URL.",
+    );
+  }
+
+  if (!/test/i.test(databaseName)) {
+    throw new Error(
+      "TEST_DATABASE_URL must point to a database whose name contains 'test'. Refusing to run API tests against a non-test database.",
+    );
+  }
+
+  return testUrl;
+}
+
+function useDatabaseSsl() {
+  if (process.env.DATABASE_SSL !== undefined)
+    return process.env.DATABASE_SSL === "true";
+  return (
+    process.env.NODE_ENV === "production" ||
+    (isTest && process.env.TEST_DATABASE_SSL === "true")
+  );
+}
+
+const connectionString = getConnectionString();
+if (!connectionString) {
+  throw new Error("DATABASE_URL is required outside the API test environment.");
 }
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: useDatabaseSsl() ? { rejectUnauthorized: false } : false,
 });
 
@@ -61,7 +95,6 @@ const db = {
       throw error;
     }
   },
-
   pool,
 };
 

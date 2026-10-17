@@ -1,79 +1,35 @@
+import express from "express";
 import { bulkCarImageController } from "../controllers/bulkCarImageController.js";
 import { bulkImageUpload } from "../middleware/bulkImageUpload.js";
-import express from "express";
-
-import { validateCarPayload } from "../middleware/validateCarPayload.js";
-
-import {
-  fetchCars,
-  fetchCarById,
-  addCar,
-} from "../controllers/carsController.js";
-
 import { uploadCarImage } from "../controllers/carImageController.js";
-
+import {
+  addCar,
+  editCar,
+  fetchCarById,
+  fetchCars,
+  removeCar,
+} from "../controllers/carsController.js";
+import { authenticateToken, isAdmin } from "../middleware/authMiddleware.js";
 import { uploadSingleCarImage } from "../middleware/uploadMiddleware.js";
 
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
-
 const router = express.Router();
-
-/*
-|--------------------------------------------------------------------------
-| CAR INVENTORY ROUTES
-|--------------------------------------------------------------------------
-*/
-
 router.get("/", fetchCars);
-
-/*
-|--------------------------------------------------------------------------
-| CAR IMAGE UPLOAD
-|--------------------------------------------------------------------------
-|
-| POST /api/cars/upload
-|
-| multipart/form-data:
-| image      = image file
-| carId      = existing car ID
-| imageType  = primary or general
-|
-*/
-
 router.post(
   "/upload",
-  protect,
-  adminOnly,
+  authenticateToken,
+  isAdmin,
   uploadSingleCarImage,
   uploadCarImage,
 );
-
-/*
-|--------------------------------------------------------------------------
-| CREATE CAR
-|--------------------------------------------------------------------------
-*/
-
-router.post("/", protect, adminOnly, validateCarPayload, addCar);
-
-/*
-|--------------------------------------------------------------------------
-| GET SINGLE CAR
-|--------------------------------------------------------------------------
-|
-| Keep this dynamic route after specific routes such as /upload.
-|
-*/
-
-router.get("/:id", fetchCarById);
-
-
+router.post("/", authenticateToken, isAdmin, addCar);
 router.post(
   "/:id/images/bulk",
-  protect,
-  adminOnly,
+  authenticateToken,
+  isAdmin,
   bulkImageUpload,
   bulkCarImageController.uploadBulkImages,
 );
-
+router.get("/:id", fetchCarById);
+router.put("/:id", authenticateToken, isAdmin, editCar);
+router.delete("/:id", authenticateToken, isAdmin, removeCar);
 export default router;

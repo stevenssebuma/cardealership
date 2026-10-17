@@ -1,317 +1,153 @@
-import bcrypt from 'bcryptjs';
-import db from '../config/database.js';
-import { generateToken } from '../middleware/authMiddleware.js';
+import bcrypt from "bcryptjs";
+import {
+  createUser,
+  deleteUser,
+  findUserByEmail,
+  findUserById,
+  listUsers,
+  updateUserPassword,
+} from "../models/userRepository.js";
+import { generateToken } from "../middleware/authMiddleware.js";
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const withoutPassword = ({ password, ...user }) => user;
+
+function tokenFor(user) {
+  return generateToken({
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.name,
+  });
+}
 
 export const authController = {
-    // ============================================
-    // REGISTER NEW USER
-    // POST /api/auth/register
-    // ============================================
-    async register(req, res) {
-        try {
-            const { name, email, password, phone, role = 'user' } = req.body;
-
-            // Validate required fields
-            if (!name || !email || !password) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Missing required fields',
-                    required: ['name', 'email', 'password']
-                });
-            }
-
-            // Validate email format
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid email format'
-                });
-            }
-
-            // Validate password strength
-            if (password.length < 6) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Password must be at least 6 characters long'
-                });
-            }
-
-            // Check if user already exists
-            const existingUser = await db.collection('users').findOne({ email: email.toLowerCase() });
-            if (existingUser) {
-                return res.status(409).json({
-                    success: false,
-                    error: 'User with this email already exists'
-                });
-            }
-
-            // Hash password
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(password, salt);
-
-            // Create user
-            const newUser = {
-                name,
-                email: email.toLowerCase(),
-                password: hashedPassword,
-                phone: phone || '',
-                role: role === 'admin' ? 'admin' : 'user', // Only allow admin if specified
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-
-            const result = await db.collection('users').insertOne(newUser);
-            const userId = result.insertedId;
-
-            // Generate token
-            const token = generateToken({
-                id: userId,
-                email: newUser.email,
-                role: newUser.role,
-                name: newUser.name
-            });
-
-            // Return success (don't include password)
-            const { password: _, ...userWithoutPassword } = newUser;
-
-            res.status(201).json({
-                success: true,
-                message: 'User registered successfully',
-                data: {
-                    user: { id: userId, ...userWithoutPassword },
-                    token
-                }
-            });
-
-        } catch (error) {
-            console.error('Registration error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Registration failed',
-                message: error.message
-            });
-        }
-    },
-
-    // ============================================
-    // LOGIN USER
-    // POST /api/auth/login
-    // ============================================
-    async login(req, res) {
-        try {
-            const { email, password } = req.body;
-
-            // Validate required fields
-            if (!email || !password) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Email and password are required'
-                });
-            }
-
-            // Find user
-            const user = await db.collection('users').findOne({ 
-                email: email.toLowerCase() 
-            });
-
-            if (!user) {
-                return res.status(401).json({
-                    success: false,
-                    error: 'Invalid email or password'
-                });
-            }
-
-            // Check password
-            const isValidPassword = await bcrypt.compare(password, user.password);
-            if (!isValidPassword) {
-                return res.status(401).json({
-                    success: false,
-                    error: 'Invalid email or password'
-                });
-            }
-
-            // Generate token
-            const token = generateToken({
-                id: user.id || user._id,
-                email: user.email,
-                role: user.role || 'user',
-                name: user.name
-            });
-
-            // Return success (don't include password)
-            const { password: _, ...userWithoutPassword } = user;
-
-            res.json({
-                success: true,
-                message: 'Login successful',
-                data: {
-                    user: userWithoutPassword,
-                    token
-                }
-            });
-
-        } catch (error) {
-            console.error('Login error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Login failed',
-                message: error.message
-            });
-        }
-    },
-
-    // ============================================
-    // GET CURRENT USER
-    // GET /api/auth/me
-    // ============================================
-    async getCurrentUser(req, res) {
-        try {
-            const userId = req.user.id;
-            const user = await db.collection('users').findOne({ 
-                $or: [{ id: userId }, { _id: userId }]
-            });
-
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    error: 'User not found'
-                });
-            }
-
-            const { password: _, ...userWithoutPassword } = user;
-
-            res.json({
-                success: true,
-                data: userWithoutPassword
-            });
-
-        } catch (error) {
-            console.error('Get user error:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        }
-    },
-
-    // ============================================
-    // LOGOUT (Client-side token removal)
-    // POST /api/auth/logout
-    // ============================================
-    async logout(req, res) {
-        // JWT is stateless, so we just tell the client to remove the token
-        res.json({
-            success: true,
-            message: 'Logged out successfully'
+  async register(req, res) {
+    try {
+      const { name, email, password } = req.body;
+      if (!name || !email || !password)
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields",
+          required: ["name", "email", "password"],
         });
-    },
+      if (!emailPattern.test(email))
+        return res
+          .status(400)
+          .json({ success: false, error: "Invalid email format" });
+      if (String(password).length < 6)
+        return res.status(400).json({
+          success: false,
+          error: "Password must be at least 6 characters long",
+        });
+      if (await findUserByEmail(email))
+        return res.status(409).json({
+          success: false,
+          error: "User with this email already exists",
+        });
 
-    // ============================================
-    // REFRESH TOKEN
-    // POST /api/auth/refresh
-    // ============================================
-    async refreshToken(req, res) {
-        try {
-            const userId = req.user.id;
-            const user = await db.collection('users').findOne({ 
-                $or: [{ id: userId }, { _id: userId }]
-            });
-
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    error: 'User not found'
-                });
-            }
-
-            const token = generateToken({
-                id: user.id || user._id,
-                email: user.email,
-                role: user.role || 'user',
-                name: user.name
-            });
-
-            res.json({
-                success: true,
-                data: { token }
-            });
-
-        } catch (error) {
-            console.error('Refresh token error:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        }
-    },
-
-    // ============================================
-    // CHANGE PASSWORD
-    // PUT /api/auth/change-password
-    // ============================================
-    async changePassword(req, res) {
-        try {
-            const { currentPassword, newPassword } = req.body;
-            const userId = req.user.id;
-
-            if (!currentPassword || !newPassword) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Current password and new password are required'
-                });
-            }
-
-            if (newPassword.length < 6) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'New password must be at least 6 characters'
-                });
-            }
-
-            const user = await db.collection('users').findOne({ 
-                $or: [{ id: userId }, { _id: userId }]
-            });
-
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    error: 'User not found'
-                });
-            }
-
-            // Verify current password
-            const isValid = await bcrypt.compare(currentPassword, user.password);
-            if (!isValid) {
-                return res.status(401).json({
-                    success: false,
-                    error: 'Current password is incorrect'
-                });
-            }
-
-            // Hash new password
-            const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-            // Update password
-            await db.collection('users').updateOne(
-                { $or: [{ id: userId }, { _id: userId }] },
-                { $set: { password: hashedPassword, updatedAt: new Date().toISOString() } }
-            );
-
-            res.json({
-                success: true,
-                message: 'Password changed successfully'
-            });
-
-        } catch (error) {
-            console.error('Change password error:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message
-            });
-        }
+      // Public registration must never grant administrative privileges.
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await createUser({
+        name,
+        email,
+        password: passwordHash,
+        role: "customer",
+      });
+      return res.status(201).json({
+        success: true,
+        message: "User registered successfully",
+        data: { user, token: tokenFor(user) },
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      return res
+        .status(500)
+        .json({ success: false, error: "Registration failed" });
     }
+  },
+
+  async login(req, res) {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password)
+        return res
+          .status(400)
+          .json({ success: false, error: "Email and password are required" });
+      const user = await findUserByEmail(email);
+      if (!user || !(await bcrypt.compare(password, user.password)))
+        return res
+          .status(401)
+          .json({ success: false, error: "Invalid email or password" });
+      return res.json({
+        success: true,
+        message: "Login successful",
+        data: { user: withoutPassword(user), token: tokenFor(user) },
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      return res.status(500).json({ success: false, error: "Login failed" });
+    }
+  },
+
+  async getCurrentUser(req, res) {
+    const user = await findUserById(req.user.id);
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+    return res.json({ success: true, data: withoutPassword(user) });
+  },
+  async logout(_req, res) {
+    return res.json({ success: true, message: "Logged out successfully" });
+  },
+  async refreshToken(req, res) {
+    const user = await findUserById(req.user.id);
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+    return res.json({ success: true, data: { token: tokenFor(user) } });
+  },
+  async changePassword(req, res) {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({
+        success: false,
+        error: "Current password and new password are required",
+      });
+    if (String(newPassword).length < 6)
+      return res.status(400).json({
+        success: false,
+        error: "New password must be at least 6 characters",
+      });
+    const user = await findUserById(req.user.id);
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+    if (!(await bcrypt.compare(currentPassword, user.password)))
+      return res
+        .status(401)
+        .json({ success: false, error: "Current password is incorrect" });
+    await updateUserPassword(user.id, await bcrypt.hash(newPassword, 10));
+    return res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  },
+  async listUsers(_req, res) {
+    const users = await listUsers();
+    return res.json({ success: true, data: users, total: users.length });
+  },
+  async deleteUser(req, res) {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0)
+      return res.status(400).json({ success: false, error: "Invalid user ID" });
+    if (id === req.user.id)
+      return res.status(422).json({
+        success: false,
+        error: "Administrators cannot delete their own account",
+      });
+    const deleted = await deleteUser(id);
+    if (!deleted)
+      return res.status(404).json({ success: false, error: "User not found" });
+    return res.json({ success: true, message: "User deleted successfully" });
+  },
 };
 
 export default authController;

@@ -1,190 +1,104 @@
-import { getAllCars, getCarById, createCar } from "../models/carsModel.js";
-
-function sendError(res, status, code, message, details = null) {
-  return res.status(status).json({
-    success: false,
-    error: {
-      code,
-      message,
-      status,
-      details,
-    },
-  });
+import {
+  createCar,
+  deleteCar,
+  getAllCars,
+  getCarById,
+  updateCar,
+} from "../models/carsModel.js";
+function failure(res, status, message) {
+  return res.status(status).json({ success: false, error: message });
 }
-
-/*
-|--------------------------------------------------------------------------
-| GET ALL CARS
-|--------------------------------------------------------------------------
-|
-| GET /api/cars
-|
-*/
-
+function validCar(body, partial = false) {
+  const year = body.year === undefined ? undefined : Number(body.year);
+  const price = body.price === undefined ? undefined : Number(body.price);
+  if (!partial && (!body.name || !(body.brand || body.make)))
+    return "Vehicle name and brand are required.";
+  if (year !== undefined && (!Number.isInteger(year) || year < 1900))
+    return "A valid vehicle year is required.";
+  if (price !== undefined && (!Number.isFinite(price) || price <= 0))
+    return "A valid vehicle price is required.";
+  return null;
+}
 export async function fetchCars(req, res) {
   try {
-    const cars = await getAllCars();
-
-    return res.status(200).json({
-      success: true,
-      count: cars.length,
-      cars,
-    });
-  } catch (error) {
-    console.error("Fetch cars failed:", error);
-
-    return sendError(
-      res,
-      500,
-      "FETCH_CARS_FAILED",
-      "Unable to load vehicle inventory.",
-      {
-        reason: error.message,
-      },
-    );
+    const cars = await getAllCars(req.query);
+    return res.json({ success: true, count: cars.length, cars });
+  } catch {
+    return failure(res, 500, "Unable to load vehicle inventory.");
   }
 }
-
-/*
-|--------------------------------------------------------------------------
-| GET SINGLE CAR
-|--------------------------------------------------------------------------
-|
-| GET /api/cars/:id
-|
-*/
-
 export async function fetchCarById(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0)
+    return failure(res, 400, "A valid car ID is required.");
   try {
-    const carId = Number(req.params.id);
-
-    if (!Number.isInteger(carId) || carId <= 0) {
-      return sendError(
-        res,
-        400,
-        "INVALID_CAR_ID",
-        "A valid car ID is required.",
-      );
-    }
-
-    const result = await getCarById(carId);
-
-    if (!result.car) {
-      return sendError(
-        res,
-        404,
-        "CAR_NOT_FOUND",
-        "The requested vehicle was not found.",
-      );
-    }
-
-    return res.status(200).json({
+    const result = await getCarById(id);
+    if (!result.car)
+      return failure(res, 404, "The requested vehicle was not found.");
+    return res.json({
       success: true,
-      car: {
-        ...result.car,
-        images: result.images,
-      },
+      car: { ...result.car, images: result.images },
     });
-  } catch (error) {
-    console.error("Fetch car by ID failed:", error);
-
-    return sendError(
-      res,
-      500,
-      "FETCH_CAR_FAILED",
-      "Unable to load the selected vehicle.",
-      {
-        reason: error.message,
-      },
-    );
+  } catch {
+    return failure(res, 500, "Unable to load the selected vehicle.");
   }
 }
-
-/*
-|--------------------------------------------------------------------------
-| CREATE CAR
-|--------------------------------------------------------------------------
-|
-| POST /api/cars
-|
-*/
-
 export async function addCar(req, res) {
+  const issue = validCar(req.body);
+  if (issue) return failure(res, 400, issue);
   try {
-    const {
-      name,
-      brand,
-      type,
-      category,
-      year,
-      price,
-      power,
-      engine,
-      drive,
-      images = [],
-    } = req.body;
-
-    const parsedYear = Number(year);
-    const parsedPrice = Number(price);
-
-    if (!name || !brand) {
-      return sendError(
-        res,
-        400,
-        "CAR_DETAILS_REQUIRED",
-        "Vehicle name and brand are required.",
-      );
-    }
-
-    if (!Number.isInteger(parsedYear) || parsedYear < 1900) {
-      return sendError(
-        res,
-        400,
-        "INVALID_YEAR",
-        "A valid vehicle year is required.",
-      );
-    }
-
-    if (Number.isNaN(parsedPrice) || parsedPrice <= 0) {
-      return sendError(
-        res,
-        400,
-        "INVALID_PRICE",
-        "A valid vehicle price is required.",
-      );
-    }
-
-    const carId = await createCar({
-      name,
-      brand,
-      type,
-      category,
-      year: parsedYear,
-      price: parsedPrice,
-      power,
-      engine,
-      drive,
-      images,
+    const id = await createCar({
+      ...req.body,
+      year: Number(req.body.year),
+      price: Number(req.body.price),
     });
-
     return res.status(201).json({
       success: true,
       message: "Vehicle created successfully.",
-      car: {
-        id: carId,
-      },
+      car: { id },
     });
   } catch (error) {
-    console.error("Create car failed:", error);
-
-    return sendError(
+    return failure(
       res,
-      500,
-      "CREATE_CAR_FAILED",
-      "Unable to create the vehicle.",
-      {
-        reason: error.message,
-      },
+      error.code === "23505" ? 409 : 500,
+      error.code === "23505"
+        ? "Vehicle identifier already exists."
+        : "Unable to create the vehicle.",
+    );
+  }
+}
+export async function editCar(req, res) {
+  const id = Number(req.params.id);
+  const issue = validCar(req.body, true);
+  if (!Number.isInteger(id) || id <= 0 || issue)
+    return failure(res, 400, issue || "A valid car ID is required.");
+  const car = await updateCar(id, {
+    ...req.body,
+    year: req.body.year === undefined ? undefined : Number(req.body.year),
+    price: req.body.price === undefined ? undefined : Number(req.body.price),
+  });
+  if (!car) return failure(res, 404, "The requested vehicle was not found.");
+  return res.json({ success: true, car });
+}
+export async function removeCar(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0)
+    return failure(res, 400, "A valid car ID is required.");
+  try {
+    const deleted = await deleteCar(id);
+    if (!deleted)
+      return failure(res, 404, "The requested vehicle was not found.");
+    return res.json({
+      success: true,
+      message: "Vehicle deleted successfully.",
+    });
+  } catch (error) {
+    return failure(
+      res,
+      error.code === "23503" ? 409 : 500,
+      error.code === "23503"
+        ? "A vehicle with existing records cannot be deleted."
+        : "Unable to delete the vehicle.",
     );
   }
 }
