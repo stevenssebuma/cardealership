@@ -1,65 +1,36 @@
 # Panda Motors API automated tests
 
-The suite sends HTTP requests through the real Express routes and uses PostgreSQL. It never uses the application `DATABASE_URL` during API tests. Existing manual scripts under `tests/` are unchanged.
+The suite sends HTTP requests through the real Express routes and a real, temporary PostgreSQL server. Existing manual scripts under `tests/` are unchanged.
 
-## Local Docker test database
+## One command: no Docker, PostgreSQL installation, or environment file
 
-A dedicated PostgreSQL 18 container is provided for repeatable API tests:
+After the usual one-time dependency installation, run this in the VS Code terminal:
 
 ```bash
 cd backend
-docker compose -f docker-compose.test.yml up -d
-```
-
-Docker Desktop displays it as **panda-motors-postgres-test**, listening only on local port **5434**. Its named volume is **panda_motors_test_pgdata**.
-
-The first setup creates ignored `backend/.env.test` with unique local credentials. Copy `backend/.env.test.example` if a new local environment file is needed. Never commit `.env.test`.
-
-For a first-time schema setup, the database must be empty. The following copies the active development **schema only**—tables, constraints, indexes, and sequences—without copying users, cars, bookings, or other business records:
-
-```bash
-npm run test:api:schema
-npm run test:api:prepare
-```
-
-`test:api:schema` refuses a non-empty database, a target whose name does not contain `test`, or a target matching the development database. To deliberately recreate the local test database, stop and remove only its local Docker volume, start it again, then run the two commands above:
-
-```bash
-docker compose -f docker-compose.test.yml down -v
-docker compose -f docker-compose.test.yml up -d
-npm run test:api:schema
-npm run test:api:prepare
-```
-
-## Safe test command
-
-Run the complete suite from `backend`:
-
-```bash
 npm run test:api
 ```
 
-The runner loads `backend/.env.test`, forces `NODE_ENV=test`, removes `DATABASE_URL`, and requires `TEST_DATABASE_URL` to point to a database whose name includes `test`. It cannot use development or production through the normal application database setting.
+The command automatically starts an embedded PostgreSQL server on an available local port, creates a temporary database, loads the schema-only snapshot, applies the booking contract, runs every API test, prints the TAP result, and removes the database files when finished.
 
-To run one group:
+It does not use `DATABASE_URL`, an `.env.test` file, Docker, a shared test database, development data, or production data.
+
+To run one group only:
 
 ```bash
 npm run test:api -- --test-name-pattern="authentication contracts"
 ```
 
-`test:api:prepare` applies the additive booking contract migration. It adds `preferred_time`, notes, timestamps, and a partial unique index for active car/date/time slots. It does not delete or reinterpret test-drive records.
+## Optional external database mode
 
-## Required test environment
+Use this only when you intentionally want to run the suite against your own disposable PostgreSQL test database. Copy `.env.test.example` to the ignored `.env.test`, configure `TEST_DATABASE_URL` with a database name containing `test`, then run:
 
-```text
-NODE_ENV=test
-POSTGRES_DB=panda_motors_test
-POSTGRES_USER=panda_motors_test
-POSTGRES_PASSWORD=<local-secret>
-TEST_DATABASE_URL=postgresql://panda_motors_test:<local-secret>@127.0.0.1:5434/panda_motors_test
-TEST_DATABASE_SSL=false
-JWT_SECRET=<long-test-only-secret>
+```bash
+npm run test:api:setup
+npm run test:api:external
 ```
+
+`test:api:setup` refuses a non-empty database or a database whose name does not contain `test`. The committed `sql/api-test-schema.sql` contains schema only: tables, constraints, indexes, and sequences. It contains no application records or credentials. Update this snapshot whenever the application database schema changes.
 
 ## Tested contracts
 

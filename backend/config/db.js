@@ -88,10 +88,12 @@ const db = {
     try {
       return await pool.query(text, params);
     } catch (error) {
-      console.error("Database query failed", {
-        code: error.code || "DATABASE_QUERY_FAILED",
-        message: "A database query could not be completed.",
-      });
+      if (process.env.API_TEST_SILENT_DATABASE_ERRORS !== "true") {
+        console.error("Database query failed", {
+          code: error.code || "DATABASE_QUERY_FAILED",
+          message: "A database query could not be completed.",
+        });
+      }
       throw error;
     }
   },

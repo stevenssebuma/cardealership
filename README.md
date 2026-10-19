@@ -1,4 +1,4 @@
-# Car Dealership
+﻿# Car Dealership
 
 A full-stack vehicle dealership application with inventory browsing, authentication, test-drive scheduling, administration features, reporting, and supporting operational tools.
 
@@ -246,11 +246,13 @@ Run the frontend regression suite:
 npm run test:regression
 ```
 
-Run API configuration validation:
+Run repeatable backend API tests for authentication, cars, bookings, and administration. The command starts an isolated temporary PostgreSQL database automatically; Docker, PostgreSQL installation, and test environment configuration are not required:
 
 ```bash
-npm run test:api-config
+npm --prefix backend run test:api
 ```
+
+For the isolated test database setup, individual test groups, endpoint contracts, and safety protections, see [the API automated-test guide](backend/docs/api-automated-testing.md).
 
 Run the backend image-cleanup validation:
 
@@ -304,17 +306,17 @@ npm run preview
 
 The historical sections below are retained for implementation context. The Sprint 10 setup and API documentation above is the authoritative contributor setup flow.
 
+# Car Dealership Website
 
-  # Car Dealership Website
+This is a code bundle for Car Dealership Website. The original project is available at https://www.figma.com/design/NPsA6njEcspPFrARnNwvCj/Car-Dealership-Website.
 
-  This is a code bundle for Car Dealership Website. The original project is available at https://www.figma.com/design/NPsA6njEcspPFrARnNwvCj/Car-Dealership-Website.
+## Running the code
 
-  ## Running the code
+Run `npm i` to install the dependencies.
 
-  Run `npm i` to install the dependencies.
+Run `npm run dev` to start the development server.
 
-  Run `npm run dev` to start the development server.
-  ---
+---
 
 ---
 
@@ -448,7 +450,7 @@ The production value above is a placeholder. A valid absolute HTTP or HTTPS URL 
 Validation commands:
 
 ```text
-npm run test:api-config
+npm --prefix backend run test:api
 VITE_API_BASE_URL=https://approved-production-api.example.com npm run build
 ```
 

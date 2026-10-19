@@ -8,13 +8,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.join(here, "..");
 const environmentPath = path.join(backendRoot, ".env.test");
 
-if (!fs.existsSync(environmentPath)) {
+const usingEmbeddedDatabase = process.env.API_TEST_EMBEDDED_RUNNER === "true";
+if (!usingEmbeddedDatabase && !fs.existsSync(environmentPath)) {
   throw new Error(
     "backend/.env.test is required. Copy .env.test.example and provide a dedicated local test database URL.",
   );
 }
 
-dotenv.config({ path: environmentPath, override: true, quiet: true });
+if (!usingEmbeddedDatabase) {
+  dotenv.config({ path: environmentPath, override: true, quiet: true });
+}
 process.env.NODE_ENV = "test";
 delete process.env.DATABASE_URL;
 

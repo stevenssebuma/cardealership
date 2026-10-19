@@ -7,7 +7,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.join(here, "..");
 const environmentPath = path.join(backendRoot, ".env.test");
 
-dotenv.config({ path: environmentPath, override: true, quiet: true });
+const usingEmbeddedDatabase = process.env.API_TEST_EMBEDDED_RUNNER === "true";
+if (!usingEmbeddedDatabase) {
+  dotenv.config({ path: environmentPath, override: true, quiet: true });
+}
 process.env.NODE_ENV = "test";
 delete process.env.DATABASE_URL;
 
