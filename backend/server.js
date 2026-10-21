@@ -20,6 +20,7 @@ const __dirname = dirname(__filename);
 // IMPORT ROUTES
 // ============================================
 import authRoutes from './routes/authRoutes.js';
+import carsRoutes from './routes/carsRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 
@@ -36,10 +37,20 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use((req, res, next) => {
+  console.info('Incoming request', {
+    method: req.method,
+    path: req.originalUrl,
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
+
 // ============================================
 // REGISTER ROUTES
 // ============================================
 app.use('/api/auth', authRoutes);
+app.use('/api/cars', carsRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/admin', adminRoutes);
 
@@ -48,6 +59,7 @@ app.use('/api/admin', adminRoutes);
 // ============================================
 app.get('/api/health', (req, res) => {
   res.json({
+    success: true,
     status: 'OK',
     message: 'Panda Motors API is running',
     version: '4.1.0',
@@ -85,17 +97,38 @@ app.get('/', (req, res) => {
 // 404 HANDLER
 // ============================================
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Endpoint not found', path: req.originalUrl });
+  res.status(404).json({
+    success: false,
+    error: {
+      code: 'NOT_FOUND',
+      message: 'Endpoint not found',
+      path: req.originalUrl
+    }
+  });
 });
 
 // ============================================
 // ERROR HANDLER
 // ============================================
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(err.status || 500).json({
+  const status = err.status || 500;
+  const code = err.code || (status >= 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_FAILED');
+
+  console.error('Unhandled error', {
+    code,
+    status,
+    method: req.method,
+    path: req.originalUrl,
+    message: err.message,
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+  });
+
+  res.status(status).json({
     success: false,
-    message: err.message || 'Internal server error'
+    error: {
+      code,
+      message: status >= 500 ? 'Internal server error' : (err.message || 'Request failed')
+    }
   });
 });
 
@@ -109,6 +142,7 @@ app.listen(PORT, () => {
   console.log('========================================');
   console.log('\n?? Routes loaded:');
   console.log('   /api/auth');
+  console.log('   /api/cars');
   console.log('   /api/bookings');
   console.log('   /api/admin');
   console.log('========================================\n');
