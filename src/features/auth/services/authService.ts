@@ -1,6 +1,6 @@
-import type { AuthSession, AuthUser, LoginCredentials, RegisterCredentials, VerifySessionResult } from "../types";
+import type { AuthError, AuthSession, AuthUser, LoginCredentials, RegisterCredentials, VerifySessionResult } from "../types";
 import { clearStoredSession, getAuthToken, getAuthenticatedUser, getStoredSession, saveSession } from "./authStorage";
-import { verifySession as verifySessionRequest, login as loginApi, register as registerApi } from "./authApi";
+import { AuthApiError, verifySession as verifySessionRequest, login as loginApi, register as registerApi } from "./authApi";
 
 export { clearStoredSession, getAuthenticatedUser, getAuthToken, getStoredSession, saveSession };
 
@@ -31,6 +31,7 @@ export async function restoreStoredSession(options: Parameters<typeof verifySess
 export type AuthResult = {
   success: boolean;
   message: string;
+  error?: AuthError;
   /**
    * Present when authentication succeeded. The caller (login/register form)
    * applies it to the AuthProvider so protected routes unlock immediately,
@@ -41,6 +42,21 @@ export type AuthResult = {
 
 function toAuthSession(token: string, user: AuthUser): AuthSession {
   return { accessToken: token, user: { ...user, id: String(user.id) } };
+}
+
+function toAuthFailure(error: unknown, fallbackMessage: string): AuthResult {
+  if (error instanceof AuthApiError) {
+    return {
+      success: false,
+      message: error.message,
+      error: { code: error.code, message: error.message, status: error.status },
+    };
+  }
+  return {
+    success: false,
+    message: fallbackMessage,
+    error: { code: "AUTH_REQUEST_FAILED", message: fallbackMessage },
+  };
 }
 
 export async function login(credentials: LoginCredentials): Promise<AuthResult> {
@@ -56,10 +72,7 @@ export async function login(credentials: LoginCredentials): Promise<AuthResult> 
       message: result.message,
     };
   } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Login failed",
-    };
+    return toAuthFailure(error, "Login failed. Please try again.");
   }
 }
 
@@ -83,9 +96,6 @@ export async function register(credentials: RegisterCredentials): Promise<AuthRe
       message: result.message,
     };
   } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Registration failed",
-    };
+    return toAuthFailure(error, "Registration failed. Please try again.");
   }
 }

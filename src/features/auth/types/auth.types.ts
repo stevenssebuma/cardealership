@@ -22,11 +22,17 @@ export type AuthErrorCode =
   | "UNAUTHORIZED"
   | "TOKEN_EXPIRED"
   | "INVALID_TOKEN"
-  | "SESSION_VERIFICATION_FAILED";
+  | "SESSION_VERIFICATION_FAILED"
+  | "INVALID_CREDENTIALS"
+  | "EMAIL_ALREADY_EXISTS"
+  | "VALIDATION_FAILED"
+  | "AUTH_SERVER_ERROR"
+  | "AUTH_REQUEST_FAILED";
 
 export interface AuthError {
   code: AuthErrorCode;
   message: string;
+  status?: number;
 }
 
 export interface AuthSession {

@@ -52,9 +52,10 @@ export async function register(req, res) {
     } = req.body || {};
 
     const normalizedEmail = normalizeEmail(email);
-    const plainPassword = String(password || "").trim();
+    const plainPassword = String(password || "");
 
-    if (!normalizedEmail || !plainPassword) {
+    if (!normalizedEmail || !plainPassword.trim()) {
+
       return res.status(400).json({
         success: false,
         message: "Email and password are required",

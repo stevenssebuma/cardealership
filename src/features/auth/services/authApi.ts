@@ -12,19 +12,127 @@ type VerifySessionOptions = {
   fetcher?: FetchLike;
 };
 
+type AuthRequestOptions = {
+  endpoint?: string;
+  fetcher?: FetchLike;
+};
+
 export type LoginResponse = {
-  success: boolean;
+  success: true;
   message: string;
-  token?: string;
-  user?: AuthUser;
+  token: string;
+  user: AuthUser;
 };
 
 export type RegisterResponse = {
-  success: boolean;
+  success: true;
   message: string;
-  token?: string;
-  user?: AuthUser;
+  token: string;
+  user: AuthUser;
 };
+
+type AuthResponsePayload = {
+  success?: boolean;
+  message?: string;
+  token?: string;
+  user?: { id?: string | number; email?: string; name?: string; role?: string; isAdmin?: boolean };
+};
+
+export class AuthApiError extends Error {
+  readonly code: AuthErrorCode;
+  readonly status?: number;
+
+  constructor(code: AuthErrorCode, message: string, status?: number) {
+    super(message);
+    this.name = "AuthApiError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function createAuthApiError(status: number, payload: AuthResponsePayload): AuthApiError {
+  if (status === 401) {
+    return new AuthApiError(
+      "INVALID_CREDENTIALS",
+      payload.message || "Invalid email or password.",
+      status,
+    );
+  }
+  if (status === 409) {
+    return new AuthApiError(
+      "EMAIL_ALREADY_EXISTS",
+      payload.message || "An account with this email already exists.",
+      status,
+    );
+  }
+  if (status === 400) {
+    return new AuthApiError(
+      "VALIDATION_FAILED",
+      payload.message || "Check the submitted information and try again.",
+      status,
+    );
+  }
+  if (status >= 500) {
+    return new AuthApiError(
+      "AUTH_SERVER_ERROR",
+      "The authentication service is temporarily unavailable. Please try again.",
+      status,
+    );
+  }
+  return new AuthApiError(
+    "AUTH_REQUEST_FAILED",
+    payload.message || "Authentication could not be completed. Please try again.",
+    status,
+  );
+}
+
+async function submitAuthRequest(
+  endpoint: string,
+  body: Record<string, string>,
+  fallbackMessage: string,
+  options: AuthRequestOptions = {},
+): Promise<LoginResponse> {
+  const fetcher = options.fetcher ?? fetch;
+  const requestUrl = options.fetcher ? options.endpoint ?? endpoint : buildApiUrl(options.endpoint ?? endpoint);
+
+  let response: Response;
+  try {
+    response = await fetcher(requestUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new AuthApiError(
+      "AUTH_REQUEST_FAILED",
+      "Unable to connect to the authentication service. Please try again.",
+    );
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as AuthResponsePayload;
+  if (!response.ok || !payload.success) {
+    throw createAuthApiError(response.status, payload);
+  }
+  if (
+    typeof payload.token !== "string" ||
+    !payload.token ||
+    !payload.user ||
+    (typeof payload.user.id !== "string" && typeof payload.user.id !== "number") ||
+    typeof payload.user.email !== "string"
+  ) {
+    throw new AuthApiError("AUTH_REQUEST_FAILED", fallbackMessage, response.status);
+  }
+
+  return {
+    success: true,
+    message: payload.message || fallbackMessage,
+    token: payload.token,
+    user: { ...payload.user, id: String(payload.user.id), email: payload.user.email },
+  };
+}
 
 function normalizeFailure(status: number, message: string): VerifySessionResult {
   const normalizedMessage = message.toLowerCase();
@@ -39,54 +147,31 @@ export function createAuthorizationHeaders(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}`, Accept: "application/json" };
 }
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
-  try {
-    const response = await fetch(buildApiUrl(AUTH_LOGIN_ENDPOINT), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = (await response.json().catch(() => ({}))) as LoginResponse;
-    return {
-      success: response.ok && data.success,
-      message: data.message || "Login failed",
-      token: data.token,
-      user: data.user,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Authentication endpoint connection failed",
-    };
-  }
+export async function login(
+  email: string,
+  password: string,
+  options: AuthRequestOptions = {},
+): Promise<LoginResponse> {
+  return submitAuthRequest(
+    AUTH_LOGIN_ENDPOINT,
+    { email, password },
+    "Login failed. Please try again.",
+    options,
+  );
 }
 
-export async function register(name: string, email: string, password: string): Promise<RegisterResponse> {
-  try {
-    const response = await fetch(buildApiUrl(AUTH_REGISTER_ENDPOINT), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ name, email, password }),
-    });
-    const data = (await response.json().catch(() => ({}))) as RegisterResponse;
-    return {
-      success: response.ok && data.success,
-      message: data.message || "Registration failed",
-      token: data.token,
-      user: data.user,
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : "Registration endpoint connection failed",
-    };
-  }
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+  options: AuthRequestOptions = {},
+): Promise<RegisterResponse> {
+  return submitAuthRequest(
+    AUTH_REGISTER_ENDPOINT,
+    { name, email, password },
+    "Registration failed. Please try again.",
+    options,
+  );
 }
 
 export async function verifySession(token: string, options: VerifySessionOptions = {}): Promise<VerifySessionResult> {
