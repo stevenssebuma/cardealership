@@ -1,4 +1,4 @@
-import { Button } from "../../../app/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type { ListingDraft, SelectedListingImage } from "../types";
 import type { ListingSubmissionResult } from "../services/listingSubmissionCoordinator";
 import { ListingSubmissionStatus } from "./ListingSubmissionStatus";

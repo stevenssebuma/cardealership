@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Button } from "../../../app/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "../../auth/hooks";
 import { useListingWizard } from "../hooks/useListingWizard";
 import { createListingService } from "../services/listingApi";

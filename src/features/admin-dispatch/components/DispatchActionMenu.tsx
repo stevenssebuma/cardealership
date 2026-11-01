@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
-import { Button } from "../../../app/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../app/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { BookingStatus } from "../types";
 import { getAllowedBookingTransitions } from "../validation/bookingTransitions";
 const LABELS: Record<BookingStatus,string>={pending:"Pending Approval",confirmed:"Confirmed",completed:"Completed",cancelled:"Canceled"};

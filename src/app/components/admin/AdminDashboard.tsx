@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../features/auth/hooks";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminListingsTable } from "./AdminListingsTable";
 import { AddNewCarForm } from "./AddNewCarForm";
 import { DispatchBoard } from "../../../features/admin-dispatch/components";

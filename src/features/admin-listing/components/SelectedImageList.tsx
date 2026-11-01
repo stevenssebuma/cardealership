@@ -1,12 +1,12 @@
-import { Button } from "../../../app/components/ui/button";
-import { Label } from "../../../app/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../app/components/ui/select";
+} from "@/components/ui/select";
 import type {
   ListingImageType,
   SelectedListingImage,

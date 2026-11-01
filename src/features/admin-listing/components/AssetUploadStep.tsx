@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import { Button } from "../../../app/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type {
   ListingImageType,
   SelectedListingImage,

@@ -1,12 +1,12 @@
-import { Input } from "../../../app/components/ui/input";
-import { Label } from "../../../app/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../app/components/ui/select";
+} from "@/components/ui/select";
 import type {
   ListingDraft,
   ListingFieldErrors,
