@@ -1,6 +1,6 @@
 import { Calendar, Clock, UserRound, Car } from "lucide-react";
-import { Badge } from "../../../app/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../app/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { BookingStatus, DispatchBooking } from "../types";
 import { DispatchActionMenu } from "./DispatchActionMenu";
 const LABELS: Record<BookingStatus,string>={pending:"Pending Approval",confirmed:"Confirmed",completed:"Completed",cancelled:"Canceled"};

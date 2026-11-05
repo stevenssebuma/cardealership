@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
-import { Button } from "../../../app/components/ui/button";
-import { Skeleton } from "../../../app/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDispatchBoard } from "../hooks/useDispatchBoard";
 import { BOOKING_STATUS_COLUMNS } from "../validation/bookingTransitions";
 import { DispatchColumn } from "./DispatchColumn";

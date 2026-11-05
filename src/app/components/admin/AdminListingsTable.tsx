@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { AdminVehicle } from "../../../types/vehicle";
 import type { VehicleStatus } from "../../lib/adminInventory";
 import { authenticatedApiRequest } from "../../../api/client";
@@ -12,7 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../ui/table";
+} from "@/components/ui/table";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { EditVehicleModal } from "./EditVehicleModal";
 
