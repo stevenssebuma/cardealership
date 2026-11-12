@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { UploadCloud, CheckCircle, X } from "lucide-react";
-import { Progress } from "../ui/progress";
-import { Button } from "../ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 export function CarImageUploader() {
 

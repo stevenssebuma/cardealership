@@ -1,144 +1,135 @@
-// backend/controllers/bookingController.js
-import pool from '../config/db.js';
+import db from '../config/db.js';
+import { validateBookingRequest } from '../utils/validators.js';
+import * as availabilityService from '../services/availabilityService.js';
 
-// Create a new booking
-export const createBooking = async (req, res) => {
+export async function createBooking(req, res) {
+  try {
     const { car_id, booking_date, time_slot, notes } = req.body;
     const user_id = req.user.id;
-    
-    try {
-        // Check if car exists and is available
-        const carCheck = await pool.query(
-            'SELECT * FROM cars WHERE id = $1 AND status = $2',
-            [car_id, 'available']
-        );
-        
-        if (carCheck.rows.length === 0) {
-            return res.status(400).json({ message: 'Car not available for booking' });
-        }
-        
-        // Check for conflicting bookings
-        const conflictCheck = await pool.query(
-            `SELECT * FROM bookings 
-             WHERE car_id = $1 
-             AND booking_date = $2 
-             AND time_slot = $3 
-             AND status != 'cancelled'`,
-            [car_id, booking_date, time_slot]
-        );
-        
-        if (conflictCheck.rows.length > 0) {
-            return res.status(400).json({ message: 'Time slot already booked' });
-        }
-        
-        // Create booking
-        const result = await pool.query(
-            `INSERT INTO bookings (user_id, car_id, booking_date, time_slot, notes, status)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING *`,
-            [user_id, car_id, booking_date, time_slot, notes, 'pending']
-        );
-        
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error('Error creating booking:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
 
-// Get user's bookings
-export const getUserBookings = async (req, res) => {
-    const user_id = req.user.id;
-    
-    try {
-        const result = await pool.query(`
-            SELECT b.*, 
-                   c.make, c.model, c.year, c.price, c.image_url
-            FROM bookings b
-            JOIN cars c ON b.car_id = c.id
-            WHERE b.user_id = $1
-            ORDER BY b.created_at DESC
-        `, [user_id]);
-        
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Error getting user bookings:', error);
-        res.status(500).json({ message: 'Server error' });
+    const validation = validateBookingRequest({ car_id, booking_date, time_slot, notes });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: validation.errors });
     }
-};
 
-// Get booking by ID
-export const getBookingById = async (req, res) => {
+    const limitCheck = await availabilityService.checkUserBookingLimits(user_id);
+    if (!limitCheck.allowed) {
+      return res.status(429).json({ success: false, message: limitCheck.message });
+    }
+
+    const car = await db.query('SELECT id FROM cars WHERE id = ?', [car_id]);
+    if (car.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Car not found' });
+    }
+
+    const availability = await availabilityService.checkSlotAvailability(null, car_id, booking_date, time_slot);
+    if (!availability.available) {
+      return res.status(409).json({
+        success: false,
+        message: 'This time slot is already booked',
+        conflict: availability.conflict
+      });
+    }
+
+    const dup = await db.query(
+      `SELECT id FROM bookings WHERE user_id = ? AND car_id = ? AND booking_date = ?
+       AND status NOT IN ('cancelled','completed')`,
+      [user_id, car_id, booking_date]
+    );
+    if (dup.rows.length > 0) {
+      return res.status(409).json({ success: false, message: 'You already have a booking for this car on this date' });
+    }
+
+    const result = await db.query(
+      `INSERT INTO bookings (user_id, car_id, booking_date, time_slot, notes, status)
+       VALUES (?, ?, ?, ?, ?, 'pending')
+       RETURNING *`,
+      [user_id, car_id, booking_date, time_slot, notes || null]
+    );
+
+    res.status(201).json({ success: true, message: 'Booking created successfully!', booking: result.rows[0] });
+  } catch (err) {
+    console.error('createBooking error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}
+
+export async function getAvailableSlots(req, res) {
+  try {
+    const { carId, date } = req.params;
+    const availability = await availabilityService.getAvailableSlots(carId, date);
+    res.json({ success: true, ...availability });
+  } catch (err) {
+    console.error('getAvailableSlots error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+export async function getWeeklyAvailability(req, res) {
+  try {
+    const { carId } = req.params;
+    const startDate = req.query.startDate || new Date().toISOString().split('T')[0];
+    const availability = await availabilityService.getWeeklyAvailability(carId, startDate);
+    res.json({ success: true, week: availability });
+  } catch (err) {
+    console.error('getWeeklyAvailability error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+export async function checkAvailability(req, res) {
+  try {
+    const { car_id, booking_date, time_slot } = req.query;
+    if (!car_id || !booking_date || !time_slot) {
+      return res.status(400).json({ success: false, message: 'Missing required parameters' });
+    }
+    const availability = await availabilityService.checkSlotAvailability(null, car_id, booking_date, time_slot);
+    res.json({
+      success: true,
+      isAvailable: availability.available,
+      car_id, booking_date, time_slot,
+      message: availability.available ? 'Available' : 'Already booked'
+    });
+  } catch (err) {
+    console.error('checkAvailability error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+export async function cancelBooking(req, res) {
+  try {
     const { id } = req.params;
     const user_id = req.user.id;
-    const isAdmin = req.user.role === 'admin';
-    
-    try {
-        const query = isAdmin
-            ? 'SELECT * FROM bookings WHERE id = $1'
-            : 'SELECT * FROM bookings WHERE id = $1 AND user_id = $2';
-        
-        const params = isAdmin ? [id] : [id, user_id];
-        const result = await pool.query(query, params);
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-        
-        res.json(result.rows[0]);
-    } catch (error) {
-        console.error('Error getting booking:', error);
-        res.status(500).json({ message: 'Server error' });
+    const result = await db.query(
+      `UPDATE bookings SET status='cancelled', updated_at=CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ? AND status IN ('pending','confirmed')
+       RETURNING *`,
+      [id, user_id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
     }
-};
+    res.json({ success: true, message: 'Booking cancelled', booking: result.rows[0] });
+  } catch (err) {
+    console.error('cancelBooking error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
 
-// Update booking
-export const updateBooking = async (req, res) => {
-    const { id } = req.params;
-    const { booking_date, time_slot, notes } = req.body;
+export async function getUserBookings(req, res) {
+  try {
     const user_id = req.user.id;
-    
-    try {
-        const result = await pool.query(
-            `UPDATE bookings 
-             SET booking_date = COALESCE($1, booking_date),
-                 time_slot = COALESCE($2, time_slot),
-                 notes = COALESCE($3, notes),
-                 updated_at = NOW()
-             WHERE id = $4 AND user_id = $5
-             RETURNING *`,
-            [booking_date, time_slot, notes, id, user_id]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-        
-        res.json(result.rows[0]);
-    } catch (error) {
-        console.error('Error updating booking:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
-
-// Cancel booking
-export const cancelBooking = async (req, res) => {
-    const { id } = req.params;
-    const user_id = req.user.id;
-    
-    try {
-        const result = await pool.query(
-            'UPDATE bookings SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
-            ['cancelled', id, user_id]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-        
-        res.json({ message: 'Booking cancelled successfully', booking: result.rows[0] });
-    } catch (error) {
-        console.error('Error cancelling booking:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
+    const result = await db.query(
+      `SELECT b.*, c.name as car_name, c.brand
+       FROM bookings b
+       JOIN cars c ON b.car_id = c.id
+       WHERE b.user_id = ?
+       ORDER BY b.created_at DESC`,
+      [user_id]
+    );
+    res.json({ success: true, count: result.rows.length, bookings: result.rows });
+  } catch (err) {
+    console.error('getUserBookings error:', err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+}

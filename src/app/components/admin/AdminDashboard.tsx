@@ -1,115 +1,65 @@
 import { useState } from "react";
-import { isAdminUser, isAuthenticated } from "../../lib/auth";
-import { Button } from "../ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../../../features/auth/hooks";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminListingsTable } from "./AdminListingsTable";
 import { AddNewCarForm } from "./AddNewCarForm";
-import { CarImageUploader } from "./CarImageUploader";
-
-type AdminVehicle = {
-  id: number;
-  name: string;
-  brand: string;
-  type: string;
-  year: number;
-  price: number;
-  condition: string;
-  image: string;
-  specs: {
-    power: string;
-    engine: string;
-    drive: string;
-  };
-};
-
-type AdminDashboardProps = {
-  vehicles: AdminVehicle[];
-};
+import { DispatchBoard } from "../../../features/admin-dispatch/components";
+import { AdminFinancingLeads } from "../../../features/financing/components/AdminFinancingLeads";
 
 /**
  * AdminDashboard
  *
  * Purpose:
- * Private admin dashboard entry component for dealership managers.
+ * Private admin inventory dashboard for dealership managers.
  *
- * Current behavior:
- * - Blocks unauthenticated users.
- * - Blocks authenticated non-admin users.
- * - Shows inventory controls only when admin access is detected.
+ * Responsibilities:
+ * - Verify administrator access.
+ * - Provide inventory workflow navigation.
+ * - Host vehicle creation, inventory management, and dispatch operations.
  *
- * TODO:
- * Replace temporary localStorage-based auth checks with the team's final
- * JWT/auth provider once the backend role payload and login route are confirmed.
+ * Inventory data is owned by the inventory components rather than being
+ * supplied by the application router.
  */
+export function AdminDashboard() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get("tab") === "financing-leads"
+      ? "financing-leads"
+      : "add-vehicle",
+  );
 
-export function AdminDashboard({ vehicles }: AdminDashboardProps) {
-  const [loginNotice, setLoginNotice] = useState("");
+  const { user, isAuthenticated, isAuthReady } = useAuth();
 
-  const authenticated = isAuthenticated();
-  const admin = isAdminUser();
-
-  if (!authenticated) {
+  if (!isAuthReady) {
     return (
-      <section className="min-h-screen py-24 px-6 lg:px-8 bg-background flex items-center">
-        <div className="max-w-3xl mx-auto text-center">
-          <p className="text-primary text-sm font-bold tracking-[0.3em] mb-4 uppercase">
-            Admin Access Required
-          </p>
-
-          <h3 className="text-4xl md:text-6xl font-bold mb-4">
-            PLEASE SIGN IN
-          </h3>
-
-          <p className="text-muted-foreground text-lg mb-8">
-            You need to sign in with an administrator account before accessing
-            the inventory control panel.
-          </p>
-
-          {loginNotice && (
-            <div className="mb-6 rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm text-foreground">
-              {loginNotice}
-            </div>
-          )}
-
-          <Button
-            className="bg-primary text-white hover:bg-primary/90"
-            onClick={() =>
-              setLoginNotice(
-                "The login page is not available yet. This admin dashboard is already protected, and final login routing will be connected once the team confirms the auth flow."
-              )
-            }
-          >
-            Sign In Guidance
-          </Button>
-        </div>
+      <section
+        className="min-h-screen py-24 px-6 lg:px-8 bg-background"
+        aria-busy="true"
+        aria-label="Verifying administrator access"
+      >
+        <p role="status" aria-live="polite">
+          Verifying administrator access...
+        </p>
       </section>
     );
   }
 
-  if (!admin) {
+  if (!isAuthenticated || user?.role !== "admin") {
     return (
-      <section className="min-h-screen py-24 px-6 lg:px-8 bg-background flex items-center">
-        <div className="max-w-3xl mx-auto text-center">
-          <p className="text-primary text-sm font-bold tracking-[0.3em] mb-4 uppercase">
-            Unauthorized
+      <section className="min-h-screen py-24 px-6 lg:px-8 bg-background">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="mb-4 text-sm font-bold uppercase tracking-[0.3em] text-primary">
+            Administrator access required
           </p>
 
-          <h3 className="text-4xl md:text-6xl font-bold mb-4">
-            ADMIN PERMISSION NEEDED
+          <h3 className="mb-4 text-4xl font-bold md:text-6xl">
+            ACCESS UNAVAILABLE
           </h3>
 
-          <p className="text-muted-foreground text-lg mb-8">
-            Your account is signed in, but it does not currently have permission
-            to access dealership management tools.
+          <p className="text-lg text-muted-foreground">
+            A verified administrator session is required.
           </p>
-
-          <Button
-            variant="outline"
-            className="border-primary text-primary hover:bg-primary hover:text-white"
-            onClick={() => window.history.pushState(null, "", "/")}
-          >
-            Back To Home
-          </Button>
         </div>
       </section>
     );
@@ -133,23 +83,46 @@ export function AdminDashboard({ vehicles }: AdminDashboardProps) {
           </p>
         </div>
 
-        <Tabs defaultValue="add-vehicle" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-8 h-12">
+        <Tabs
+          value={activeTab}
+          onValueChange={(tab) => {
+            setActiveTab(tab);
+            setSearchParams(tab === "add-vehicle" ? {} : { tab });
+          }}
+          className="w-full"
+        >
+          <TabsList className="grid w-full max-w-3xl grid-cols-4 mb-8 h-12">
             <TabsTrigger value="add-vehicle" className="font-semibold">
               Add Vehicle
             </TabsTrigger>
+
             <TabsTrigger value="manage-inventory" className="font-semibold">
               Manage Inventory
+            </TabsTrigger>
+
+            <TabsTrigger value="dispatch" className="font-semibold">
+              Dispatch Board
+            </TabsTrigger>
+            <TabsTrigger value="financing-leads" className="font-semibold">
+              Financing Leads
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="add-vehicle">
-            <AddNewCarForm />
-            <CarImageUploader />
+            <AddNewCarForm
+              onPublishSuccess={() => setActiveTab("manage-inventory")}
+            />
           </TabsContent>
 
           <TabsContent value="manage-inventory">
-            <AdminListingsTable vehicles={vehicles} />
+            <AdminListingsTable />
+          </TabsContent>
+
+          <TabsContent value="dispatch">
+            <DispatchBoard />
+          </TabsContent>
+          <TabsContent value="financing-leads">
+            <AdminFinancingLeads />
           </TabsContent>
         </Tabs>
       </div>

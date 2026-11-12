@@ -34,6 +34,7 @@ export type TestDriveBookingResult = {
 export type TestDriveVehicleOption = {
   id: number;
   name: string;
-  brand: string;
+  make: string;
+  model?: string | null;
   year: number;
 };
