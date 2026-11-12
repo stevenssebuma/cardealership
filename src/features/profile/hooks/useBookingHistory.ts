@@ -44,14 +44,18 @@ export function useBookingHistory() {
     return response;
   }, [accessToken, logout]);
 
+  /**
+   * Resolves to `true` only when the booking was cancelled and the list has been
+   * re-read, so the caller can move focus to a control that still exists.
+   */
   const cancelBooking = useCallback(
-    async (bookingId: string) => {
+    async (bookingId: string): Promise<boolean> => {
       setCancelError(null);
       setCancelNotice(null);
 
       if (!accessToken) {
         setCancelError("Your session has expired. Please sign in again.");
-        return;
+        return false;
       }
 
       setPendingCancelId(bookingId);
@@ -63,19 +67,21 @@ export function useBookingHistory() {
       if (response.success === true) {
         setCancelNotice(response.message);
         await refresh();
-        return;
+        return true;
       }
 
       // A rejected session is handled the same way as a failed load: end the
       // session rather than leaving a button that can never succeed.
       if (response.success === false && response.code === "UNAUTHORIZED") {
         logout();
-        return;
+        return false;
       }
 
       if (response.success === false) {
         setCancelError(response.message);
       }
+
+      return false;
     },
     [accessToken, logout, refresh],
   );

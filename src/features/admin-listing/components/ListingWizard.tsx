@@ -31,7 +31,7 @@ export function ListingWizard({ maximumImages, onPublishSuccess }: ListingWizard
       const result = await coordinatorRef.current.submit({ accessToken: accessToken ?? "", input: { draft: state.draft, images: state.images }, checkpoint: checkpointRef.current });
       checkpointRef.current = result.checkpoint;
       setSubmissionResult(result);
-      if (!result.success) {
+      if (result.success === false) {
         setServerErrors(result.fieldErrors ?? {});
         if (result.code === "UNAUTHORIZED" || result.code === "SESSION_EXPIRED") logout();
         return;

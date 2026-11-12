@@ -195,7 +195,9 @@ export class ListingSubmissionCoordinator {
           };
         }
 
-        if (!listingResult.success) {
+        // Explicit discriminant so the failure branch narrows to the
+        // `Extract<ListingResult, { success: false }>` that mapListingFailure takes.
+        if (listingResult.success === false) {
           return mapListingFailure(listingResult, checkpoint);
         }
 
@@ -236,7 +238,7 @@ export class ListingSubmissionCoordinator {
           checkpoint,
         );
 
-        if (!uploadResult.success) {
+        if (uploadResult.success === false) {
           return {
             success: false,
             stage: "recoverable-failure",

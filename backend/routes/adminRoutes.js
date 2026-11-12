@@ -1,6 +1,7 @@
 import express from 'express';
 
 import { authenticateToken, checkRole, rateLimitProtectedRoute } from '../middleware/authMiddleware.js';
+import { getUserBookingsForAdmin } from '../controllers/bookingController.js';
 import pool from '../config/db.js';
 
 const router = express.Router();
@@ -190,11 +191,23 @@ router.get('/stats/summary', ...adminGuard, async (req, res) => {
 
 router.get('/users', ...adminGuard, async (req, res) => {
     try {
-        // The password hash is never selected.
+        // The password hash is never selected. The booking count lets the
+        // console show how much history each customer has without a second
+        // request per row.
         const result = await pool.query(`
-            SELECT id, name, email, role, phone, created_at, updated_at
-            FROM users
-            ORDER BY created_at DESC
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.role,
+                u.phone,
+                u.created_at,
+                u.updated_at,
+                COUNT(b.id)::int AS booking_count
+            FROM users u
+            LEFT JOIN bookings b ON b.user_id = u.id
+            GROUP BY u.id, u.name, u.email, u.role, u.phone, u.created_at, u.updated_at
+            ORDER BY u.created_at DESC
         `);
 
         return res.json({
@@ -208,6 +221,14 @@ router.get('/users', ...adminGuard, async (req, res) => {
 });
 
 // ============================================
+// GET /api/admin/users/:user_id/bookings
+// ============================================
+
+// Full history for one customer, cancelled bookings included. Staff read only:
+// status changes stay on PUT /api/admin/bookings/:id/status.
+router.get('/users/:user_id/bookings', ...adminGuard, getUserBookingsForAdmin);
+
+// ============================================
 // GET /api/admin/bookings
 // ============================================
 
@@ -216,6 +237,7 @@ router.get('/bookings', ...adminGuard, async (req, res) => {
         const result = await pool.query(`
             SELECT
                 b.id,
+                b.user_id,
                 b.status,
                 b.booking_date,
                 b.time_slot,

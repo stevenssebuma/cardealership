@@ -1,5 +1,9 @@
 # Sprint 8 Validation Report
 
+> **Snapshot of this sprint.** The counts below are the record of Sprint 8, not the current suite.
+> Current backend runner: `cd backend && npm test` → 6 suites / 62 tests. Booking contract:
+> [../sprint6/sprint6-validation-report.md](../sprint6/sprint6-validation-report.md) § Task 3.
+
 ## Final outcome
 
 - Sprint 8 targeted suites: PASS

@@ -172,8 +172,12 @@ export function BookingHistory() {
     completed: null,
     cancelled: null,
   });
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
 
-  if (isLoading) {
+  // Only the first load swaps the card for a skeleton. A refresh (after a
+  // cancellation or a retry) keeps the tabs mounted, which both avoids a
+  // full-card flash and keeps the tab refs available for focus restoration.
+  if (isLoading && !result) {
     return (
       <Card className="profile-settings-wide">
         <CardContent className="booking-loading">
@@ -220,6 +224,27 @@ export function BookingHistory() {
     focusTab(TABS[(index + direction + TABS.length) % TABS.length]);
   };
 
+  /**
+   * Cancelling unmounts the row that held focus, which would drop keyboard and
+   * screen-reader users at the top of the document. On success focus returns to
+   * the tab that owns the list; on failure it moves to the error message.
+   */
+  const handleConfirmCancel = async (bookingId: string) => {
+    const cancelled = await cancelBooking(bookingId);
+    setConfirmingId(null);
+
+    // Focus after the commit that renders the new state (the refreshed list or
+    // the error message), not while React is still applying it.
+    requestAnimationFrame(() => {
+      if (cancelled) {
+        tabRefs.current[activeTab]?.focus();
+        return;
+      }
+
+      errorRef.current?.focus();
+    });
+  };
+
   return (
     <Card className="profile-settings-wide">
       <CardHeader>
@@ -242,7 +267,12 @@ export function BookingHistory() {
               </p>
             )}
             {cancelError && (
-              <p className="booking-cancel-error" role="alert">
+              <p
+                className="booking-cancel-error"
+                role="alert"
+                tabIndex={-1}
+                ref={errorRef}
+              >
                 {cancelError}
               </p>
             )}
@@ -306,7 +336,7 @@ export function BookingHistory() {
             confirmingId={confirmingId}
             pendingCancelId={pendingCancelId}
             onAskCancel={setConfirmingId}
-            onConfirmCancel={(bookingId) => void cancelBooking(bookingId)}
+            onConfirmCancel={(bookingId) => void handleConfirmCancel(bookingId)}
             onKeep={() => setConfirmingId(null)}
           />
         </div>

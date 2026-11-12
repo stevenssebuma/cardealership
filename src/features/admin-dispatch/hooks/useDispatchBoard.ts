@@ -19,8 +19,11 @@ export function useDispatchBoard(options: UseDispatchBoardOptions = {}) {
     const requestId = ++loadSequenceRef.current;
     const result = await serviceRef.current.listBookings(accessToken ?? "");
     if (requestId !== loadSequenceRef.current) return result;
-    if (result.success) dispatch({ type: "bookings/load", bookings: result.bookings });
-    else {
+    // Explicit comparisons: `strict` is off in tsconfig.check.json, so a
+    // truthiness check does not narrow these discriminated unions.
+    if (result.success === true) {
+      dispatch({ type: "bookings/load", bookings: result.bookings });
+    } else if (result.success === false) {
       dispatch({ type: "bookings/load-failed", code: result.code, message: result.message });
       if (result.code === "UNAUTHORIZED") logout();
     }
@@ -51,12 +54,18 @@ export function useDispatchBoard(options: UseDispatchBoardOptions = {}) {
         targetStatus,
         booking.updatedAt,
       );
-    if (result.success) dispatch({ type: "mutation/succeed", booking: result.booking, mutationId });
-    else {
+    if (result.success === true) {
+      dispatch({ type: "mutation/succeed", booking: result.booking, mutationId });
+      return true;
+    }
+
+    if (result.success === false) {
       dispatch({ type: "mutation/fail", bookingId, mutationId, code: result.code, message: result.message });
       if (result.code === "UNAUTHORIZED") logout();
+      return false;
     }
-    return result.success;
+
+    return false;
   }, [accessToken, logout, state.bookings, state.pendingByBooking]);
 
   return { state, refresh, moveBooking };

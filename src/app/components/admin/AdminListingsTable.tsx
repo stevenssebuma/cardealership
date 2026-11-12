@@ -11,26 +11,13 @@ import {
 } from "@/components/ui/table";
 import { MOCK_VEHICLES } from "@/features/cars/data/mockVehicles";
 import { formatUGX } from "@/features/cars/utils/formatUGX";
+// One shared vehicle shape: this table used to declare its own narrower copy,
+// which made an `AdminVehicle[]` from src/types/vehicle unusable as its props.
+import type { AdminVehicle } from "../../../types/vehicle";
+import type { VehicleStatus } from "../../lib/adminInventory";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 
-type VehicleStatus = "Available" | "Pending Test Drive" | "Sold";
-
-export type AdminVehicle = {
-  id: number;
-  name: string;
-  make: string;
-  type: string;
-  year: number;
-  price: number;
-  condition: string;
-  status?: VehicleStatus;
-  image: string;
-  specs: {
-    power: string;
-    engine: string;
-    drive: string;
-  };
-};
+export type { AdminVehicle };
 
 type AdminListingsTableProps = {
   vehicles?: AdminVehicle[];
@@ -62,6 +49,10 @@ function getStatusBadgeClass(status: VehicleStatus) {
 
   if (status === "Pending Test Drive") {
     return "bg-yellow-500 text-black hover:bg-yellow-600";
+  }
+
+  if (status === "Reserved") {
+    return "bg-blue-600 text-white hover:bg-blue-700";
   }
 
   return "bg-muted text-muted-foreground hover:bg-muted";

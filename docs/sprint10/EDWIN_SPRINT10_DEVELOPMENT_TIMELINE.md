@@ -21,7 +21,8 @@ Edwin is responsible for project setup documentation, API testing, build verific
 1. `POST /api/auth/register`
 2. `POST /api/auth/login`
 3. `GET /api/cars`
-4. `POST /api/test-drives`
+4. `POST /api/test-drives` (legacy request-only endpoint; the persisted booking flow is
+   `POST /api/bookings/create`, see ../sprint6/sprint6-validation-report.md § Task 3)
 5. `GET /api/admin/stats`
 
 ## Verified Starting Baseline

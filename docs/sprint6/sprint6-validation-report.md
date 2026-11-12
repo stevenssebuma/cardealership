@@ -51,6 +51,13 @@ reads or mutates a booking without an ownership check.
 | `GET /api/bookings/user/:user_id` | required | caller's own account or an admin, otherwise `403` |
 | `PUT /api/bookings/:id/cancel` | required | booking owner or an admin, otherwise `403`; already cancelled → `400`; unknown id → `404` |
 | `GET /api/bookings/check-availability` | public | slot lookup only, exposes no customer data |
+| `GET /api/admin/users` | admin | customer directory with a per-customer booking count |
+| `GET /api/admin/users/:user_id/bookings` | admin | full history including cancelled, read-only |
+
+`POST /api/bookings/create` answers `404` for an unknown vehicle, `409` when the car/date/slot is
+already taken and `429` when the customer's active-booking allowance is exhausted. `GET
+/api/bookings/me` returns cancelled bookings; `GET /api/bookings/user/:user_id` excludes them, so
+staff read cancelled history through the admin route instead.
 
 Composition is verified by `backend/tests/integration/bookingRouteContract.integration.test.js`, which
 asserts that each customer route is wrapped in `rateLimitProtectedRoute, authenticateToken`, that the
@@ -93,8 +100,10 @@ backend/tests/testDriveEmail.integration.test.js confirmation email, reminder ch
 backend/tests/dbTransaction.integration.test.js  transaction rollback, release and partial-write safety
 backend/tests/integration/bookingRouteContract.integration.test.js  route composition contract
 backend/tests/helpers/bookingTestPool.js         stateful bookings double
-.github/workflows/backend-integration-tests.yml CI gate on pull requests to main
 ```
+
+No CI workflow is committed yet: `.github/workflows/` exists but is empty, so `npm test` is run
+locally (and by hand before a merge) rather than gated on a pull request.
 
 ### Design notes
 
@@ -110,11 +119,12 @@ backend/tests/helpers/bookingTestPool.js         stateful bookings double
 cd backend
 npm test
 
-Test Suites: 5 passed, 5 total
-Tests:       52 passed, 52 total
+Test Suites: 6 passed, 6 total
+Tests:       62 passed, 62 total
 ```
 
-Live smoke check on the running API (real server, real configuration, PostgreSQL on port 5433):
+Live smoke check on the running API (real server, real configuration, PostgreSQL on port 5433).
+Recorded 2026-11-12; the booking ids are from that run:
 
 ```text
 GET  /api/health                              -> 200

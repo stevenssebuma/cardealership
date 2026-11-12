@@ -449,6 +449,65 @@ export async function getUserBookings(req, res) {
 }
 
 /* ------------------------------------------------------------------ *
+ * GET /api/admin/users/:user_id/bookings
+ *
+ * Admin-only view of one customer's complete history. Unlike the
+ * customer-facing /api/bookings/user/:user_id route this keeps cancelled
+ * bookings, because staff need to see what was called off.
+ * ------------------------------------------------------------------ */
+
+export async function getUserBookingsForAdmin(req, res) {
+  try {
+    const userId = Number(req.params.user_id);
+
+    if (!isPositiveInteger(userId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID',
+      });
+    }
+
+    const customer = await db.query(
+      `SELECT id, name, email, role, phone, created_at
+       FROM users
+       WHERE id = $1`,
+      [userId],
+    );
+
+    if (customer.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Customer not found',
+      });
+    }
+
+    const result = await db.query(
+      `${BOOKING_SELECT}
+       WHERE b.user_id = $1
+       ORDER BY b.booking_date DESC, b.id DESC`,
+      [userId],
+    );
+
+    const bookings = result.rows.map(serializeRow);
+
+    return res.json({
+      success: true,
+      user: customer.rows[0],
+      total: bookings.length,
+      bookings,
+    });
+  } catch (error) {
+    console.error('Admin customer bookings error:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message,
+    });
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * PUT /api/bookings/:id/cancel
  * ------------------------------------------------------------------ */
 

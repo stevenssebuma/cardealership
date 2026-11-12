@@ -44,8 +44,15 @@ function getErrorMessage(
   return payload?.error?.message ?? payload?.message ?? fallback;
 }
 
+export type ListingUploadServiceOptions = {
+  /** Injectable fetch used by the deterministic manual test suite. */
+  fetcher?: typeof fetch;
+};
+
 class LiveListingUploadService implements ListingUploadService {
   private uploadInFlight = false;
+
+  constructor(private readonly fetcher?: typeof fetch) {}
 
   async uploadImages(
     accessToken: string,
@@ -104,14 +111,23 @@ class LiveListingUploadService implements ListingUploadService {
         formData.append("imageType", image.imageType);
 
         try {
-          const response = await authenticatedApiRequest(
-            "/api/cars/upload",
-            accessToken,
-            {
-              method: "POST",
-              body: formData,
-            },
-          );
+          const response = this.fetcher
+            ? await this.fetcher("/api/cars/upload", {
+                method: "POST",
+                headers: {
+                  Accept: "application/json",
+                  Authorization: `Bearer ${accessToken}`,
+                },
+                body: formData,
+              })
+            : await authenticatedApiRequest(
+                "/api/cars/upload",
+                accessToken,
+                {
+                  method: "POST",
+                  body: formData,
+                },
+              );
 
           let responseBody: ApiUploadResponse | null = null;
 
@@ -268,6 +284,8 @@ class LiveListingUploadService implements ListingUploadService {
   }
 }
 
-export function createListingUploadService(): ListingUploadService {
-  return new LiveListingUploadService();
+export function createListingUploadService(
+  options: ListingUploadServiceOptions = {},
+): ListingUploadService {
+  return new LiveListingUploadService(options.fetcher);
 }

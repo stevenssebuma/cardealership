@@ -3,6 +3,7 @@ import {
   createInitialListingWizardState,
   listingWizardReducer,
 } from "../features/admin-listing/state";
+import type { ListingWizardAction } from "../features/admin-listing/state";
 import type { SelectedListingImage } from "../features/admin-listing/types";
 
 let state = createInitialListingWizardState();
@@ -140,9 +141,13 @@ assert.equal(state.isSubmitting, false);
 
 const stateBeforeUnknownAction = state;
 
+// The reducer still has a defensive `default: return state` for actions it does
+// not know (replayed or persisted payloads). Callers can no longer build one
+// through the action union, so the cast is deliberate: it exercises the runtime
+// guard rather than the type system.
 state = listingWizardReducer(state, {
   type: "unknown/action",
-});
+} as unknown as ListingWizardAction);
 
 assert.equal(state, stateBeforeUnknownAction);
 

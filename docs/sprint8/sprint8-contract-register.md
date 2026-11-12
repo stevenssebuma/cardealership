@@ -50,14 +50,14 @@ This register records verified contracts and unresolved integration boundaries f
 
 ## Booking status updates
 
-- Status: BLOCKED.
-- Confirmed values include `pending`, `confirmed`, and `cancelled`.
+- Status: PARTIAL — route confirmed in code (verified 2026-11-12); live transition behaviour still unvalidated.
+- Confirmed route: `PUT /api/admin/bookings/:id/status`, mounted under `/api/admin` and wrapped in the
+  admin guard (`rateLimitProtectedRoute`, `authenticateToken`, `checkRole(['admin'])`).
+- Persisted statuses: `pending`, `confirmed`, `completed`, `cancelled`. The route rejects any other value.
 - `cancelled` is the current authoritative spelling.
-- `completed` is not confirmed as a persisted status or legal transition.
-- The existing update controller accepts arbitrary status text.
-- No allowed-transition graph is enforced.
-- A mounted protected administrator status-update route was not confirmed.
-- Idempotency, stale-update, conflict, versioning, and audit behavior are not confirmed.
+- No allowed-transition graph is enforced: every allowlisted value is accepted for every booking,
+  including moves out of `cancelled`.
+- Idempotency, stale-update, conflict, versioning, and audit behaviour are not confirmed.
 
 ## Administrator security
 
@@ -76,8 +76,8 @@ This register records verified contracts and unresolved integration boundaries f
 
 - Do not guess a batch-upload route or field name.
 - Do not guess image-ordering fields.
-- Do not guess a booking-status mutation route.
-- Do not enable `completed` until backend support is confirmed.
+- Do not invent a second booking-status mutation route: use `PUT /api/admin/bookings/:id/status`.
+- Do not present `completed` as an auditable transition: the status is supported, the audit trail is not.
 - Do not add successful MFA behavior before the backend challenge contract exists.
 - Do not submit the current frontend payload directly without an approved field mapping.
 - Do not represent isolated mock validation as live integration.

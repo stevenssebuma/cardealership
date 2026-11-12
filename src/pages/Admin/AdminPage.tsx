@@ -1,5 +1,5 @@
 // src/pages/Admin/AdminPage.tsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, LogOut, MessageSquare } from "lucide-react";
 
@@ -10,8 +10,11 @@ import { formatUGX } from "@/features/cars/utils/formatUGX";
 import { AdminShell } from "@/app/components/admin/AdminShell";
 import { UnreadChatBadge } from "@/features/admin-chat/components/UnreadChatBadge";
 import { useAdminChat } from "@/features/admin-chat/hooks";
+import { CustomersPanel } from "@/features/admin-customers/components/CustomersPanel";
+import { CustomerBookingsDrawer } from "@/features/admin-customers/components/CustomerBookingsDrawer";
+import { useAdminCustomers } from "@/features/admin-customers/hooks";
 
-type AdminTab = "overview" | "pending" | "bookings";
+type AdminTab = "overview" | "pending" | "bookings" | "customers";
 
 type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
@@ -60,6 +63,8 @@ interface PendingPayload {
 
 interface AdminBooking {
   id: number;
+  // The admin bookings payload is snake_case, like user_name / car_name below.
+  user_id: number;
   user_name: string;
   car_name: string;
   booking_date: string;
@@ -110,6 +115,30 @@ const AdminPage = () => {
   // The dashboard renders inside the /Admin layout, which owns the chat
   // provider, so this count stays live while the admin works the console.
   const { totalUnreadCount } = useAdminChat();
+
+  const {
+    isLoading: customersLoading,
+    result: customersResult,
+    refresh: refreshCustomers,
+  } = useAdminCustomers();
+
+  // One drawer serves both entry points: the customers table and the customer
+  // cell in the bookings table.
+  const [selectedCustomer, setSelectedCustomer] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  // The sheet is state-driven (no Radix trigger), so the opening control is
+  // remembered here and handed to the drawer for focus restoration on close.
+  const drawerTriggerRef = useRef<HTMLElement | null>(null);
+
+  const openCustomer = useCallback(
+    (customer: { id: number; name: string }, trigger: HTMLElement) => {
+      drawerTriggerRef.current = trigger;
+      setSelectedCustomer(customer);
+    },
+    [],
+  );
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -222,13 +251,22 @@ const AdminPage = () => {
   const pendingCount =
     pending?.totalPending ?? pending?.pendingBookings.length ?? 0;
 
+  const customerCount =
+    customersResult && customersResult.success === true
+      ? customersResult.customers.length
+      : null;
+
   const tabs: { id: AdminTab; label: string }[] = useMemo(
     () => [
       { id: "overview", label: "Overview" },
       { id: "pending", label: `Pending approvals (${pendingCount})` },
       { id: "bookings", label: "Bookings" },
+      {
+        id: "customers",
+        label: customerCount === null ? "Customers" : `Customers (${customerCount})`,
+      },
     ],
-    [pendingCount],
+    [customerCount, pendingCount],
   );
 
   if (loading) {
@@ -596,7 +634,21 @@ const AdminPage = () => {
                     {bookings.map((booking) => (
                       <tr key={booking.id}>
                         <td className="admin-cell--muted">#{booking.id}</td>
-                        <td>{booking.user_name}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="admin-link-button"
+                            onClick={(event) =>
+                              openCustomer(
+                                { id: booking.user_id, name: booking.user_name },
+                                event.currentTarget,
+                              )
+                            }
+                            aria-label={`View booking history for ${booking.user_name}`}
+                          >
+                            {booking.user_name}
+                          </button>
+                        </td>
                         <td>{booking.car_name}</td>
                         <td>{formatBookingDate(booking.booking_date)}</td>
                         <td>
@@ -634,7 +686,27 @@ const AdminPage = () => {
             )}
           </section>
         )}
+
+        {activeTab === "customers" && (
+          <CustomersPanel
+            isLoading={customersLoading}
+            result={customersResult}
+            onRefresh={() => void refreshCustomers()}
+            onOpenCustomer={openCustomer}
+          />
+        )}
       </div>
+
+      <CustomerBookingsDrawer
+        customerId={selectedCustomer?.id ?? null}
+        customerName={selectedCustomer?.name}
+        returnFocusTo={drawerTriggerRef.current}
+        onClose={() => setSelectedCustomer(null)}
+        onShowAllBookings={() => {
+          setSelectedCustomer(null);
+          setActiveTab("bookings");
+        }}
+      />
     </AdminShell>
   );
 };
