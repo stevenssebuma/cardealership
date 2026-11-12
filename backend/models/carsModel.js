@@ -1,4 +1,4 @@
-import db from "../config/db.js";
+import db, { withTransaction } from "../config/db.js";
 
 // GET ALL CARS
 
@@ -20,14 +20,17 @@ export const getAllCars = async () => {
       cs.engine,
       cs.drive,
       COALESCE((
-        SELECT json_group_array(json_object(
-          'id', ci.id,
-          'url', ci.image_url,
-          'type', ci.image_type
-        ))
+        SELECT json_agg(
+          json_build_object(
+            'id', ci.id,
+            'url', ci.image_url,
+            'type', ci.image_type
+          )
+          ORDER BY ci.id
+        )
         FROM car_images ci
         WHERE ci.car_id = c.id
-      ), '[]') AS images,
+      ), '[]'::json) AS images,
       (
         SELECT ci.image_url
         FROM car_images ci
@@ -97,9 +100,7 @@ export const createCar = async (data) => {
     images = [],
   } = data;
 
-  await db.query("BEGIN");
-
-  try {
+  return withTransaction(async (client) => {
     const carInsert = `
       INSERT INTO cars (
         vin,
@@ -122,7 +123,7 @@ export const createCar = async (data) => {
       RETURNING id;
     `;
 
-    const carResult = await db.query(carInsert, [
+    const carResult = await client.query(carInsert, [
       vin,
       make,
       model,
@@ -140,7 +141,7 @@ export const createCar = async (data) => {
 
     const carId = carResult.rows[0].id;
 
-    await db.query(
+    await client.query(
       `
         INSERT INTO car_specs (
           car_id,
@@ -161,7 +162,7 @@ export const createCar = async (data) => {
           continue;
         }
 
-        await db.query(
+        await client.query(
           `
             INSERT INTO car_images (
               car_id,
@@ -175,13 +176,8 @@ export const createCar = async (data) => {
       }
     }
 
-    await db.query("COMMIT");
-
     return carId;
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
+  });
 };
 
 // UPDATE CAR
@@ -213,14 +209,11 @@ export const updateCar = async (id, data) => {
     ([field, value]) => specFields.includes(field) && value !== undefined,
   );
 
-  await db.query("BEGIN");
-
-  try {
-    const existing = await db.query(`SELECT id FROM cars WHERE id = $1;`, [id]);
+  const wasUpdated = await withTransaction(async (client) => {
+    const existing = await client.query(`SELECT id FROM cars WHERE id = $1;`, [id]);
 
     if (existing.rowCount === 0) {
-      await db.query("ROLLBACK");
-      return null;
+      return false;
     }
 
     if (carEntries.length > 0) {
@@ -232,7 +225,7 @@ export const updateCar = async (id, data) => {
 
       values.push(id);
 
-      await db.query(
+      await client.query(
         `
           UPDATE cars
           SET
@@ -245,7 +238,7 @@ export const updateCar = async (id, data) => {
     }
 
     if (specEntries.length > 0) {
-      const currentSpecs = await db.query(
+      const currentSpecs = await client.query(
         `
           SELECT power, engine, drive
           FROM car_specs
@@ -264,7 +257,7 @@ export const updateCar = async (id, data) => {
       };
 
       if (currentSpecs.rowCount > 0) {
-        await db.query(
+        await client.query(
           `
             UPDATE car_specs
             SET
@@ -276,7 +269,7 @@ export const updateCar = async (id, data) => {
           [nextSpecs.power, nextSpecs.engine, nextSpecs.drive, id],
         );
       } else {
-        await db.query(
+        await client.query(
           `
             INSERT INTO car_specs (
               car_id,
@@ -291,22 +284,22 @@ export const updateCar = async (id, data) => {
       }
     }
 
-    await db.query("COMMIT");
+    return true;
+  });
 
-    return getCarById(id);
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
+  if (!wasUpdated) {
+    return null;
   }
+
+  // Read after commit so the caller sees committed state.
+  return getCarById(id);
 };
 
 // DELETE CAR
 
-export const deleteCar = async (id) => {
-  await db.query("BEGIN");
-
-  try {
-    const existing = await db.query(
+export const deleteCar = async (id) =>
+  withTransaction(async (client) => {
+    const existing = await client.query(
       `
         SELECT id, name
         FROM cars
@@ -316,15 +309,14 @@ export const deleteCar = async (id) => {
     );
 
     if (existing.rowCount === 0) {
-      await db.query("ROLLBACK");
       return null;
     }
 
-    await db.query(`DELETE FROM car_images WHERE car_id = $1;`, [id]);
+    await client.query(`DELETE FROM car_images WHERE car_id = $1;`, [id]);
 
-    await db.query(`DELETE FROM car_specs WHERE car_id = $1;`, [id]);
+    await client.query(`DELETE FROM car_specs WHERE car_id = $1;`, [id]);
 
-    const result = await db.query(
+    const result = await client.query(
       `
         DELETE FROM cars
         WHERE id = $1
@@ -333,14 +325,8 @@ export const deleteCar = async (id) => {
       [id],
     );
 
-    await db.query("COMMIT");
-
     return result.rows[0];
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
-};
+  });
 
 // SAVE CAR IMAGE
 

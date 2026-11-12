@@ -117,6 +117,8 @@ const queryMock = jest.fn(async (sql, params = []) => {
 // connection to PostgreSQL is attempted.
 jest.unstable_mockModule("../config/db.js", () => ({
   default: { query: queryMock, on: () => {} },
+  withTransaction: async (callback) =>
+    callback({ query: queryMock, release: () => {} }),
   verifyDatabaseConnection: async () => ({
     connected: true,
     database: "integration_test",

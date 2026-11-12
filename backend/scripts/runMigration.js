@@ -1,26 +1,25 @@
 /**
  * Database Migration Runner
- * Executes the 008_security_sessions_mfa.sql against the PostgreSQL database
+ *
+ * Executes a SQL migration file against the PostgreSQL database configured by
+ * backend/.env. Environment loading and SSL configuration come from
+ * config/db.js so this script can never drift from the API's connection rules.
  */
 
-import pkg from 'pg';
-const { Pool } = pkg;
 import fs from 'fs';
 import path from 'path';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
+
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load backend/.env explicitly so the script works from any working directory.
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-});
+// Imported after the environment is loaded so config/db.js sees DATABASE_URL.
+const { default: pool } = await import('../config/db.js');
 
 async function runMigration() {
   const client = await pool.connect();
@@ -34,26 +33,17 @@ async function runMigration() {
 
     console.log('Executing SQL migrations...\n');
 
-    // Execute the SQL content
     await client.query(sqlContent);
 
-    console.log('\n✅ Database migration completed successfully!');
-    console.log('Created tables:');
-    console.log('  - auth_sessions');
-    console.log('  - user_mfa');
-    console.log('  - mfa_backup_codes');
-    console.log('  - mfa_attempts');
-    console.log('\nAdded columns to users table:');
-    console.log('  - mfa_enabled');
-    console.log('  - mfa_verified_at');
+    console.log('\nDatabase migration completed successfully!');
   } catch (error) {
-    console.error('❌ Migration failed:', error.message);
+    console.error('Migration failed:', error.message);
     if (error.detail) {
       console.error('Details:', error.detail);
     }
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
-    await client.release();
+    client.release();
     await pool.end();
   }
 }

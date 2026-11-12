@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTestDrive } from "../hooks";
+import { getConfirmationEmailMessage } from "../utils/confirmationMessage";
 import { AvailabilitySlotPicker } from "./AvailabilitySlotPicker";
 import type { TestDriveVehicleOption } from "../types";
 
@@ -72,15 +73,14 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                 <h4 className="text-3xl font-bold mb-3">Test Drive Request Sent</h4>
                 <p className="text-muted-foreground mb-2">
                   {confirmation?.message ||
-                    `Your request for ${selectedVehicle?.brand} ${selectedVehicle?.name} on ${date} at ${time} has been captured.`}
+                    `Your request for ${selectedVehicle?.make} ${selectedVehicle?.name} on ${date} at ${time} has been captured.`}
                 </p>
                 <p className="text-muted-foreground mb-6">
-                  {selectedVehicle?.brand} {selectedVehicle?.name} on {date} at {time}
+                  {selectedVehicle?.make} {selectedVehicle?.name} on {date} at {time}
                   {confirmation?.reference ? ` · Reference ${confirmation.reference}` : ""}
                 </p>
                 <p className="text-sm text-muted-foreground mb-6">
-                  A confirmation email is sent to your account address and our team will call you
-                  on {phone} if anything about the slot needs to change.
+                  {getConfirmationEmailMessage(confirmation?.notification, phone)}
                 </p>
                 <Button
                   type="button"
@@ -117,7 +117,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                     >
                       {vehicles.map((vehicle) => (
                         <option key={vehicle.id} value={vehicle.id}>
-                          {vehicle.brand} {vehicle.name} — {vehicle.year}
+                          {vehicle.make} {vehicle.name} — {vehicle.year}
                         </option>
                       ))}
                     </select>

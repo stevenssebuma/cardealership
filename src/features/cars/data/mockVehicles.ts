@@ -4,7 +4,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 1,
     name: "Land Cruiser V8",
-    brand: "Toyota",
+    make: "Toyota",
     type: "Luxury SUV",
     year: 2023,
     price: 285000000,
@@ -21,7 +21,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 2,
     name: "S-Class S500",
-    brand: "Mercedes-Benz",
+    make: "Mercedes-Benz",
     type: "Luxury Sedan",
     year: 2023,
     price: 360000000,
@@ -38,7 +38,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 3,
     name: "Range Rover Sport",
-    brand: "Land Rover",
+    make: "Land Rover",
     type: "Sport Luxury SUV",
     year: 2023,
     price: 420000000,
@@ -55,7 +55,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 4,
     name: "X5 xDrive40i",
-    brand: "BMW",
+    make: "BMW",
     type: "Sports SUV",
     year: 2023,
     price: 195000000,
@@ -72,7 +72,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 5,
     name: "Land Cruiser Prado TZ",
-    brand: "Toyota",
+    make: "Toyota",
     type: "Premium SUV",
     year: 2022,
     price: 168000000,
@@ -89,7 +89,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
   {
     id: 6,
     name: "LX 570",
-    brand: "Lexus",
+    make: "Lexus",
     type: "Ultra Luxury SUV",
     year: 2023,
     price: 390000000,

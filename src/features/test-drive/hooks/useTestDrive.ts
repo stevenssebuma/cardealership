@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useAuth } from "@/features/auth/hooks";
 import { TestDriveBookingError, submitTestDriveBooking } from "../services";
-import type { TestDriveBookingPayload, TestDriveVehicleOption } from "../types";
+import type {
+  TestDriveBookingPayload,
+  TestDriveBookingResult,
+  TestDriveVehicleOption,
+} from "../types";
 import { useBookingAvailability } from "./useBookingAvailability";
 import { canSubmitWithAvailability, shouldClearSelectedTime } from "../utils/availabilitySelection";
 import { getTodayDateInputValue } from "../utils/bookingDate";
@@ -22,7 +26,7 @@ export function useTestDrive(vehicles: TestDriveVehicleOption[]) {
   const [error, setError] = useState("");
   const [authMessage, setAuthMessage] = useState("");
   const [success, setSuccess] = useState(false);
-  const [confirmation, setConfirmation] = useState<{ message: string; reference: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<TestDriveBookingResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const availability = useBookingAvailability(selectedVehicleId, date);
   const selectedVehicle = vehicles.find((vehicle) => vehicle.id.toString() === selectedVehicleId);
@@ -122,7 +126,9 @@ export function useTestDrive(vehicles: TestDriveVehicleOption[]) {
     try {
       setSubmitting(true);
       const result = await submitTestDriveBooking(bookingPayload);
-      setConfirmation({ message: result.message, reference: result.reference ?? "" });
+      // Keep the whole result: the receipt reports whether the confirmation
+      // email was actually accepted by the mail server.
+      setConfirmation(result);
       setSuccess(true);
       setNotes("");
       // Refreshing availability here would flip the picker to "loading" and blank

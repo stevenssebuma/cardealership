@@ -8,6 +8,34 @@
   Run `npm i` to install the dependencies.
 
   Run `npm run dev` to start the development server.
+
+  ## Local development database
+
+  The API needs PostgreSQL. `backend/.env` points `DATABASE_URL` at a local cluster
+  (the previously used managed instance is kept as a commented line).
+
+  ```text
+  host 127.0.0.1   port 5433   database cardealership   user postgres (trust auth)
+  data directory   C:\Users\y\.kombai\dev-pg
+  ```
+
+  ```powershell
+  # start / stop the local cluster
+  & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D "C:\Users\y\.kombai\dev-pg" -o "-p 5433 -c listen_addresses=localhost" start
+  & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D "C:\Users\y\.kombai\dev-pg" stop
+  ```
+
+  ```text
+  cd backend
+  npm run seed:inventory   # creates the schema and 6 demo vehicles (idempotent)
+  node reset-admin.js      # development admin: admin@dealership.com
+  npm run seed:bookings    # demo test-drive bookings for the admin dashboard
+  npm start                # API on http://localhost:5500
+  ```
+
+  TLS is decided from the connection string: managed hosts get SSL automatically and
+  localhost runs without it. Use `DATABASE_SSL=true` to force SSL on, or
+  `sslmode=require` in the URL. `GET /api/cars` serves the inventory.
   ---
 
 ---
@@ -160,11 +188,29 @@ https://youtu.be/HNtln75HTEg
 
 ---
 
+## Local sign-in (development only)
+
+`backend/.env` sets `AUTH_ALLOW_ANY_CREDENTIALS=true`, which makes `POST /api/auth/login`
+accept any email and password while `NODE_ENV` is not `production`:
+
+- an unknown address creates the account on first sign-in (name derived from the address);
+- an existing account skips the stored password check;
+- addresses whose local part starts with `admin` (`admin@dealership.com`, `admin@pandamotors.co.ug`, ...) are created with the `admin` role, so `/Admin` is reachable for demos.
+
+The server prints the active policy under `--- Sign-in policy ---` at startup. Set the flag to
+`false` to restore normal credential checks; it is ignored entirely in production, and the
+integration suite forces it off so `rejects a wrong password` keeps testing the real contract.
+
+Seeded admin: `admin@dealership.com` / `admin123` (`backend/reset-admin.js`).
+
 ## Sprint 6 Automated Test Drive Email Pipeline
 
 The test drive booking lifecycle now sends transactional email automatically:
 
 - An immediate confirmation receipt is sent from `POST /api/bookings/create` through `backend/services/emailService.js`.
+- The booking is attributed to the account that owns the bearer token. The request requires a signed-in session (`401` otherwise) and any `user_id` in the body is ignored, so a client cannot book in another customer's name or spend their booking allowance.
+- `GET /api/bookings/user/:user_id` and `PUT /api/bookings/:id/cancel` are token-scoped too: a customer only reaches their own history and can only cancel their own booking (`403` for anyone else's; admins may act on any booking). `GET /api/bookings/check-availability` stays public.
+- The confirmation email always goes to the account address on the token. A `user_email` in the body is ignored, so the endpoint cannot be used to mail arbitrary recipients.
 - A background checker (`backend/jobs/testDriveReminderJob.js`) emails a reminder when an appointment is approximately 24 hours away and marks the booking with `reminderSent` so a reminder is never duplicated.
 - Both sends are non-blocking: a booking is always saved even when email delivery fails, and the pipeline is skipped safely (never throwing) when no provider is configured.
 
@@ -175,6 +221,39 @@ EMAIL_PROVIDER=nodemailer with EMAIL_HOST/EMAIL_PORT/EMAIL_USER/EMAIL_PASSWORD/E
   -> fall back to the Ethereal test account (ETHEREAL_USER / ETHEREAL_PASSWORD)
   -> otherwise skip the send safely
 ```
+
+A provider counts as configured only when **every** required key is non-empty. Missing
+`EMAIL_USER` / `EMAIL_PASSWORD` silently push delivery onto the Ethereal fallback, whose test
+account expires, which is what a `535 Authentication failed` log line means.
+
+Credentials live in the gitignored `backend/.env` (never in `.env.example`):
+
+```text
+EMAIL_PROVIDER=nodemailer
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=<mailbox>@<domain>
+EMAIL_PASSWORD=<app password>
+EMAIL_FROM="Panda Motors <mailbox>@<domain>"
+EMAIL_REPLY_TO=sales@pandamotors.co.ug
+```
+
+Gmail rejects the account password over SMTP: enable 2-Step Verification, then create an App
+Password and paste that. `EMAIL_FROM` must belong to the authenticated mailbox or Gmail rewrites
+the sender. For any other provider use its own host/port and SMTP credentials.
+
+Verify the mailbox before booking against real data:
+
+```text
+cd backend
+npm run email:verify                                # prints provider + SMTP handshake result
+npm run email:verify -- --to=you@example.com        # sends one real confirmation email
+```
+
+Exit codes: `0` ready, `1` a required environment key is missing, `2` SMTP rejected the
+connection or credentials. The server also prints the resolved provider and the missing keys on
+startup, so a misconfiguration is visible without reading the booking log.
 
 Reminder checker settings (`backend/.env`):
 

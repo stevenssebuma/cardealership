@@ -3,8 +3,8 @@ import { resolveSelectedVehicleId } from "../features/test-drive/utils/vehicleSe
 import type { TestDriveVehicleOption } from "../features/test-drive/types";
 
 const vehicles: TestDriveVehicleOption[] = [
-  { id: 1, name: "Toyota Land Cruiser ZX", brand: "Toyota", year: 2023 },
-  { id: 2, name: "BMW X5", brand: "BMW", year: 2022 },
+  { id: 1, make: "Toyota", name: "Toyota Land Cruiser ZX", year: 2023 },
+  { id: 2, make: "BMW", name: "BMW X5", year: 2022 },
 ];
 
 // The scheduler mounts before the inventory request resolves, so the first

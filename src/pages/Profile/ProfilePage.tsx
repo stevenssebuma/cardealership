@@ -13,13 +13,14 @@ import {
   Customer,
   getMyProfile,
   updateMyProfile
-} from '../services/api';
+} from '../../services/api';
+import { Navbar } from '../../app/components/Navbar/Navbar';
+import { useAuth } from '../../features/auth/hooks';
+import { BookingHistory } from '../../features/profile/components/BookingHistory';
 
-import { Navbar } from '../app/components/Navbar/Navbar';
-import { useAuth } from '../features/auth/hooks';
 
 // @ts-ignore: CSS file is imported for styling
-import "../styles/index.css";
+import "../../styles/index.css";
 
 interface ProfileForm {
   name: string;
@@ -416,6 +417,12 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* Test drives for this account, with self-service cancellation. The
+          backend scopes both the read and the cancel to the session token. */}
+      <section className="profile-bookings" aria-label="Test-drive history">
+        <BookingHistory />
       </section>
     </ProfileShell>
   );

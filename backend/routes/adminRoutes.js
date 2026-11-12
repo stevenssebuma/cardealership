@@ -1,209 +1,400 @@
 import express from 'express';
+
 import { authenticateToken, checkRole, rateLimitProtectedRoute } from '../middleware/authMiddleware.js';
-import db from '../config/database.js';
+import pool from '../config/db.js';
 
 const router = express.Router();
 
+// Every admin endpoint requires a rate limit, a valid token and the admin role.
+const adminGuard = [rateLimitProtectedRoute, authenticateToken, checkRole(['admin'])];
+
+const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'];
+
+const toNumber = (value) => (value === null || value === undefined ? 0 : Number(value));
+
+function sendServerError(res, label, error) {
+    console.error(`${label}:`, error.message);
+
+    return res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error.message
+    });
+}
+
 // ============================================
-// ADMIN ROUTES
+// GET /api/admin/stats - Full dashboard metrics
 // ============================================
 
-// GET /api/admin/stats - Full admin statistics
-router.get('/stats', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
+router.get('/stats', ...adminGuard, async (req, res) => {
     try {
-        // Get all collections
-        const cars = await db.collection('cars').find({}).toArray();
-        const bookings = await db.collection('bookings').find({}).toArray();
-        const sales = await db.collection('sales').find({}).toArray();
-        const users = await db.collection('users').find({}).toArray();
+        const [carStats, userStats, bookingStats, popularCars, monthlyTrend] = await Promise.all([
+            pool.query(`
+                SELECT
+                    COUNT(*)::int AS total,
+                    COUNT(*) FILTER (WHERE status = 'Available')::int AS available,
+                    COUNT(*) FILTER (WHERE status = 'Reserved')::int AS reserved,
+                    COUNT(*) FILTER (WHERE status = 'Sold')::int AS sold,
+                    COALESCE(ROUND(AVG(price)), 0)::bigint AS average_price
+                FROM cars
+            `),
+            pool.query(`SELECT COUNT(*)::int AS total FROM users`),
+            pool.query(`
+                SELECT
+                    COUNT(*) FILTER (WHERE status <> 'cancelled')::int AS total,
+                    COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+                    COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
+                    COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
+                    COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled
+                FROM bookings
+            `),
+            pool.query(`
+                SELECT
+                    c.id,
+                    c.name,
+                    c.make,
+                    c.price,
+                    COUNT(b.id)::int AS booking_count
+                FROM cars c
+                JOIN bookings b ON b.car_id = c.id AND b.status <> 'cancelled'
+                GROUP BY c.id, c.name, c.make, c.price
+                ORDER BY booking_count DESC, c.name ASC
+                LIMIT 5
+            `),
+            pool.query(`
+                SELECT
+                    TO_CHAR(months.month, 'Mon') AS month,
+                    COUNT(b.id)::int AS bookings
+                FROM generate_series(
+                    date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',
+                    date_trunc('month', CURRENT_DATE),
+                    INTERVAL '1 month'
+                ) AS months(month)
+                LEFT JOIN bookings b
+                    ON date_trunc('month', b.created_at) = months.month
+                    AND b.status <> 'cancelled'
+                GROUP BY months.month
+                ORDER BY months.month
+            `)
+        ]);
 
-        // Total revenue
-        const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
+        // COUNT queries always return one row; default defensively so a driver
+        // that returns nothing can never turn the dashboard into a 500.
+        const cars = carStats.rows[0] ?? {};
+        const users = userStats.rows[0] ?? {};
+        const bookings = bookingStats.rows[0] ?? {};
 
-        // Total bookings
-        const totalBookings = bookings.filter(b => b.status !== 'cancelled').length;
-
-        // Cars in inventory
-        const inventoryCount = cars.length;
-
-        // Average car price
-        const avgPrice = cars.length > 0
-            ? cars.reduce((sum, car) => sum + car.price, 0) / cars.length
-            : 0;
-
-        // Recent bookings (last 7 days)
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const recentBookings = bookings.filter(b => {
-            const bookingDate = new Date(b.createdAt || b.date);
-            return bookingDate >= oneWeekAgo && b.status !== 'cancelled';
-        });
-
-        // Booking by car model
-        const bookingsByModel = {};
-        bookings.forEach(b => {
-            if (b.status !== 'cancelled') {
-                const model = b.carModel || b.car_model || 'Unknown';
-                bookingsByModel[model] = (bookingsByModel[model] || 0) + 1;
-            }
-        });
-
-        // Sales by month
-        const salesByMonth = {};
-        sales.forEach(sale => {
-            const month = sale.date.substring(0, 7); // YYYY-MM
-            salesByMonth[month] = (salesByMonth[month] || 0) + sale.amount;
-        });
-
-        // Recent sales (last 5)
-        const recentSales = [...sales]
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, 5);
-
-        res.json({
+        return res.json({
             success: true,
             stats: {
-                totalRevenue,
-                totalBookings,
-                inventoryCount,
-                averageCarPrice: Math.round(avgPrice),
-                totalSales: sales.length,
-                totalUsers: users.length,
-                recentBookings: recentBookings.length,
-                bookingsByModel,
-                salesByMonth,
-                recentSales,
-                currency: 'UGX'
+                cars: {
+                    total: toNumber(cars.total),
+                    available: toNumber(cars.available),
+                    reserved: toNumber(cars.reserved),
+                    sold: toNumber(cars.sold),
+                    averagePrice: toNumber(cars.average_price)
+                },
+                users: {
+                    total: toNumber(users.total)
+                },
+                bookings: {
+                    total: toNumber(bookings.total),
+                    pending: toNumber(bookings.pending),
+                    confirmed: toNumber(bookings.confirmed),
+                    completed: toNumber(bookings.completed),
+                    cancelled: toNumber(bookings.cancelled)
+                },
+                // There is no payments or sales table in this schema, so revenue
+                // is reported as unavailable instead of being invented.
+                revenue: {
+                    monthly: null,
+                    total: null,
+                    currency: 'UGX',
+                    available: false
+                },
+                popularCars: popularCars.rows.map((car) => ({
+                    id: car.id,
+                    name: car.name,
+                    make: car.make,
+                    price: toNumber(car.price),
+                    bookingCount: car.booking_count
+                })),
+                monthlyTrend: monthlyTrend.rows.map((row) => ({
+                    month: row.month,
+                    bookings: row.bookings
+                }))
             },
             timestamp: new Date().toISOString()
         });
-
     } catch (error) {
-        console.error('Admin stats error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Internal server error',
-            message: error.message
-        });
+        return sendServerError(res, 'Admin stats error', error);
     }
 });
 
+// ============================================
 // GET /api/admin/stats/summary - Quick summary
-router.get('/stats/summary', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
+// ============================================
+
+router.get('/stats/summary', ...adminGuard, async (req, res) => {
     try {
-        const cars = await db.collection('cars').find({}).toArray();
-        const bookings = await db.collection('bookings').find({}).toArray();
-        const sales = await db.collection('sales').find({}).toArray();
+        const [carCount, bookingCounts, mtdCount, previousMonthCount] = await Promise.all([
+            pool.query(`SELECT COUNT(*)::int AS total FROM cars`),
+            pool.query(`
+                SELECT
+                    COUNT(*) FILTER (WHERE status <> 'cancelled')::int AS total,
+                    COUNT(*) FILTER (WHERE status = 'pending')::int AS pending
+                FROM bookings
+            `),
+            pool.query(`
+                SELECT COUNT(*)::int AS total
+                FROM bookings
+                WHERE status <> 'cancelled'
+                  AND created_at >= date_trunc('month', CURRENT_DATE)
+            `),
+            pool.query(`
+                SELECT COUNT(*)::int AS total
+                FROM bookings
+                WHERE status <> 'cancelled'
+                  AND created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '1 month'
+                  AND created_at < date_trunc('month', CURRENT_DATE)
+            `)
+        ]);
 
-        const totalRevenue = sales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalBookings = bookings.filter(b => b.status !== 'cancelled').length;
-        const inventoryCount = cars.length;
-
-        // Calculate month-to-date revenue
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const mtdRevenue = sales
-            .filter(sale => new Date(sale.date) >= monthStart)
-            .reduce((sum, sale) => sum + sale.amount, 0);
-
-        // Calculate growth (compare with last month)
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-        const lastMonthRevenue = sales
-            .filter(sale => {
-                const saleDate = new Date(sale.date);
-                return saleDate >= lastMonth && saleDate <= lastMonthEnd;
-            })
-            .reduce((sum, sale) => sum + sale.amount, 0);
-
-        const growth = lastMonthRevenue > 0
-            ? ((mtdRevenue - lastMonthRevenue) / lastMonthRevenue * 100).toFixed(1)
+        const monthToDate = toNumber(mtdCount.rows[0]?.total);
+        const previousMonth = toNumber(previousMonthCount.rows[0]?.total);
+        const growth = previousMonth > 0
+            ? Number((((monthToDate - previousMonth) / previousMonth) * 100).toFixed(1))
             : 0;
 
-        res.json({
+        return res.json({
             success: true,
             summary: {
-                totalRevenue,
-                mtdRevenue,
-                totalBookings,
-                inventoryCount,
-                growth: parseFloat(growth),
-                growthLabel: growth >= 0 ? 'Up' : 'Down',
-                currency: 'UGX'
+                inventoryCount: toNumber(carCount.rows[0]?.total),
+                totalBookings: toNumber(bookingCounts.rows[0]?.total),
+                pendingBookings: toNumber(bookingCounts.rows[0]?.pending),
+                bookingsThisMonth: monthToDate,
+                bookingsLastMonth: previousMonth,
+                growth,
+                growthLabel: growth >= 0 ? 'Up' : 'Down'
             },
             timestamp: new Date().toISOString()
         });
-
     } catch (error) {
-        console.error('Admin summary error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Internal server error',
-            message: error.message
-        });
+        return sendServerError(res, 'Admin summary error', error);
     }
 });
 
-// GET /api/admin/users - Get all users (admin only)
-router.get('/users', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
+// ============================================
+// GET /api/admin/users
+// ============================================
+
+router.get('/users', ...adminGuard, async (req, res) => {
     try {
-        const users = await db.collection('users').find({}).toArray();
+        // The password hash is never selected.
+        const result = await pool.query(`
+            SELECT id, name, email, role, phone, created_at, updated_at
+            FROM users
+            ORDER BY created_at DESC
+        `);
 
-        // Remove passwords from response
-        const safeUsers = users.map(user => {
-            const { password, ...safeUser } = user;
-            return safeUser;
-        });
-
-        res.json({
+        return res.json({
             success: true,
-            data: safeUsers,
-            total: safeUsers.length
+            data: result.rows,
+            total: result.rows.length
         });
     } catch (error) {
-        console.error('Admin users error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return sendServerError(res, 'Admin users error', error);
     }
 });
 
-// GET /api/admin/bookings - Get all bookings (admin only)
-router.get('/bookings', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
-    try {
-        const bookings = await db.collection('bookings').find({}).toArray();
+// ============================================
+// GET /api/admin/bookings
+// ============================================
 
-        res.json({
+router.get('/bookings', ...adminGuard, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                b.id,
+                b.status,
+                b.booking_date,
+                b.time_slot,
+                b.notes,
+                b.created_at,
+                u.name AS user_name,
+                u.email AS user_email,
+                c.name AS car_name,
+                c.make AS car_make
+            FROM bookings b
+            LEFT JOIN users u ON u.id = b.user_id
+            LEFT JOIN cars c ON c.id = b.car_id
+            ORDER BY b.created_at DESC
+        `);
+
+        return res.json({
             success: true,
-            data: bookings,
-            total: bookings.length
+            data: result.rows,
+            total: result.rows.length
         });
     } catch (error) {
-        console.error('Admin bookings error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        return sendServerError(res, 'Admin bookings error', error);
     }
 });
 
-// GET /api/admin/cars - Get all cars (admin only)
-router.get('/cars', rateLimitProtectedRoute, authenticateToken, checkRole(['admin']), async (req, res) => {
-    try {
-        const cars = await db.collection('cars').find({}).toArray();
+// ============================================
+// GET /api/admin/cars
+// ============================================
 
-        res.json({
+router.get('/cars', ...adminGuard, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                c.*,
+                cs.power,
+                cs.engine,
+                cs.drive,
+                (
+                    SELECT ci.image_url
+                    FROM car_images ci
+                    WHERE ci.car_id = c.id AND ci.image_type = 'primary'
+                    ORDER BY ci.id ASC
+                    LIMIT 1
+                ) AS primary_image
+            FROM cars c
+            LEFT JOIN car_specs cs ON cs.car_id = c.id
+            ORDER BY c.created_at DESC
+        `);
+
+        return res.json({
             success: true,
-            data: cars,
-            total: cars.length
+            data: result.rows,
+            total: result.rows.length
         });
     } catch (error) {
-        console.error('Admin cars error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
+        return sendServerError(res, 'Admin cars error', error);
+    }
+});
+
+// ============================================
+// GET /api/admin/pending-approvals
+// ============================================
+
+router.get('/pending-approvals', ...adminGuard, async (req, res) => {
+    try {
+        const [pendingBookings, reservedCars] = await Promise.all([
+            pool.query(`
+                SELECT
+                    b.id,
+                    b.booking_date,
+                    b.time_slot,
+                    b.created_at,
+                    u.name AS user_name,
+                    u.email AS user_email,
+                    c.name AS car_name,
+                    c.make AS car_make
+                FROM bookings b
+                LEFT JOIN users u ON u.id = b.user_id
+                LEFT JOIN cars c ON c.id = b.car_id
+                WHERE b.status = 'pending'
+                ORDER BY b.created_at ASC
+            `),
+            pool.query(`
+                SELECT id, name, make, price, status
+                FROM cars
+                WHERE status = 'Reserved'
+                ORDER BY created_at ASC
+            `)
+        ]);
+
+        return res.json({
+            success: true,
+            totalPending: pendingBookings.rows.length,
+            pendingBookings: pendingBookings.rows,
+            pendingCars: reservedCars.rows.map((car) => ({
+                ...car,
+                price: toNumber(car.price)
+            })),
+            totalReservedCars: reservedCars.rows.length
         });
+    } catch (error) {
+        return sendServerError(res, 'Admin pending approvals error', error);
+    }
+});
+
+// ============================================
+// PUT /api/admin/bookings/:id/status
+// ============================================
+
+router.put('/bookings/:id/status', ...adminGuard, async (req, res) => {
+    try {
+        const bookingId = Number(req.params.id);
+        const { status } = req.body || {};
+
+        if (!Number.isInteger(bookingId) || bookingId <= 0) {
+            return res.status(400).json({ success: false, message: 'A valid booking id is required.' });
+        }
+
+        if (!BOOKING_STATUSES.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Status must be one of: ${BOOKING_STATUSES.join(', ')}.`
+            });
+        }
+
+        const result = await pool.query(
+            `UPDATE bookings
+             SET status = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2
+             RETURNING id, status, booking_date, time_slot`,
+            [status, bookingId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Booking not found.' });
+        }
+
+        return res.json({
+            success: true,
+            message: 'Booking status updated.',
+            booking: result.rows[0]
+        });
+    } catch (error) {
+        return sendServerError(res, 'Admin booking status error', error);
+    }
+});
+
+// ============================================
+// PUT /api/admin/cars/:id/approve
+// ============================================
+
+router.put('/cars/:id/approve', ...adminGuard, async (req, res) => {
+    try {
+        const carId = Number(req.params.id);
+
+        if (!Number.isInteger(carId) || carId <= 0) {
+            return res.status(400).json({ success: false, message: 'A valid car id is required.' });
+        }
+
+        // Approving a reserved listing publishes it back to the public inventory.
+        const result = await pool.query(
+            `UPDATE cars
+             SET status = 'Available', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $1
+             RETURNING id, name, status`,
+            [carId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, message: 'Vehicle not found.' });
+        }
+
+        return res.json({
+            success: true,
+            message: 'Vehicle approved.',
+            car: result.rows[0]
+        });
+    } catch (error) {
+        return sendServerError(res, 'Admin car approval error', error);
     }
 });
 

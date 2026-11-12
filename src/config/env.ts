@@ -59,9 +59,18 @@ export function resolveChatEnvironment(
   environment: PublicChatEnvironment,
 ): ChatEnvironmentConfiguration {
   const requestedTransport = environment.VITE_CHAT_TRANSPORT?.trim() || "mock";
-  const mockMode = resolveBooleanEnvironmentValue(
-    environment.VITE_CHAT_MOCK_MODE,
-  );
+  const configuredMockMode = environment.VITE_CHAT_MOCK_MODE?.trim().toLowerCase();
+
+  // The mock transport is only usable when mock mode is on, and it is the
+  // default transport while the gateway protocol is unconfirmed. Leaving
+  // VITE_CHAT_MOCK_MODE unset used to disable it, which surfaced as a
+  // "transport is unavailable" banner and a read-only inbox. An explicit
+  // "false" still opts out, and createChatSocket refuses mock mode in
+  // production builds.
+  const mockMode =
+    configuredMockMode === undefined || configuredMockMode === ""
+      ? requestedTransport === "mock"
+      : configuredMockMode === "true";
 
   if (
     requestedTransport !== "mock" &&

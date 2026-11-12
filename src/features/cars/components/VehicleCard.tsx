@@ -27,7 +27,7 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
 
         {/* Brand */}
         <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-black/70 backdrop-blur-sm text-white px-2.5 py-1 sm:px-3 text-[10px] sm:text-xs font-bold tracking-wide rounded-sm">
-          {vehicle.brand}
+          {vehicle.make}
         </div>
 
         {/* Year + Condition */}

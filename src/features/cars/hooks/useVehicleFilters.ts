@@ -18,7 +18,7 @@ export function useVehicleFilters(vehicles: Vehicle[]) {
   const filteredVehicles = useMemo(() => {
     return vehicles.filter((vehicle) => {
       const matchesBrand = queryFilters.brand
-        ? `${vehicle.brand} ${vehicle.name}`
+        ? `${vehicle.make} ${vehicle.name}`
             .toLowerCase()
             .includes(queryFilters.brand.toLowerCase())
         : true;

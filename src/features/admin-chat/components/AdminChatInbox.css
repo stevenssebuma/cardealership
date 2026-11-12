@@ -720,3 +720,233 @@
     transition: none;
   }
 }
+
+/* ================================
+   ADMIN CONSOLE SURFACES
+   The inbox is mounted inside the shared admin shell (`.admin-page`), which
+   carries the dark showroom surface and tokens of the profile page. These
+   overrides swap the original light palette for those tokens without changing
+   the inbox's two-panel behaviour.
+================================ */
+
+.admin-page .admin-chat-page-shell {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-page-header h1 {
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-page-header > div > p:last-child {
+  color: var(--muted-foreground);
+}
+
+.admin-page .admin-chat-eyebrow {
+  color: var(--primary);
+}
+
+.admin-page .admin-chat-synthetic-label {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.admin-page .admin-chat-layout {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+}
+
+.admin-page .admin-chat-list-panel {
+  border-right-color: var(--border);
+  background: var(--card);
+}
+
+.admin-page .admin-chat-thread-panel {
+  background: var(--background);
+}
+
+.admin-page .admin-chat-list-header h2 {
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-list-count,
+.admin-page .admin-chat-unread-summary {
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  color: var(--primary);
+}
+
+.admin-page .admin-chat-search-shell {
+  border-color: var(--border);
+  background: var(--input-background);
+  color: var(--muted-foreground);
+}
+
+.admin-page .admin-chat-search-shell input {
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-conversation-item {
+  border-top-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-conversation-item:hover {
+  background: color-mix(in srgb, var(--secondary) 70%, transparent);
+}
+
+.admin-page .admin-chat-conversation-selected,
+.admin-page .admin-chat-conversation-item.admin-chat-conversation-selected:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  box-shadow: inset 3px 0 var(--primary);
+}
+
+.admin-page .admin-chat-conversation-heading strong {
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-conversation-heading time,
+.admin-page .admin-chat-conversation-preview > span:first-child,
+.admin-page .admin-chat-list-status,
+.admin-page .admin-chat-history-status {
+  color: var(--muted-foreground);
+}
+
+.admin-page .admin-chat-vehicle-label {
+  color: var(--primary);
+}
+
+.admin-page .admin-chat-unread-badge {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.admin-page .admin-chat-thread-header {
+  border-bottom-color: var(--border);
+  background: var(--card);
+}
+
+.admin-page .admin-chat-thread-identity h2 {
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-thread-identity > p:last-child {
+  color: var(--muted-foreground);
+}
+
+.admin-page .admin-chat-back-button {
+  border-color: var(--border);
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-connection,
+.admin-page .admin-chat-composer-meta,
+.admin-page .admin-chat-composer-note,
+.admin-page .admin-chat-typing {
+  color: var(--muted-foreground);
+}
+
+.admin-page .admin-chat-typing-dots {
+  color: var(--primary);
+}
+
+.admin-page .admin-chat-message {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.admin-page .admin-chat-message-customer {
+  border-color: var(--border);
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-message-admin {
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-delivery-failed {
+  color: #fca5a5;
+}
+
+.admin-page .admin-chat-message-retry {
+  border-color: color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+.admin-page .admin-chat-message-retry:focus-visible {
+  outline-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+
+.admin-page .admin-chat-composer {
+  border-top-color: var(--border);
+  background: var(--card);
+}
+
+.admin-page .admin-chat-composer textarea {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-background);
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-composer button {
+  border-radius: 6px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.admin-page .admin-chat-composer-error {
+  color: #fca5a5;
+}
+
+.admin-page .admin-chat-empty-state,
+.admin-page .admin-chat-empty-state p {
+  color: var(--muted-foreground);
+}
+
+.admin-page .admin-chat-empty-state h2 {
+  color: var(--foreground);
+}
+
+.admin-page .admin-chat-list-error,
+.admin-page .admin-chat-thread-error {
+  border-color: rgba(252, 165, 165, 0.35);
+  background: rgba(220, 38, 38, 0.12);
+  color: #fca5a5;
+}
+
+.admin-page .admin-chat-list-error button,
+.admin-page .admin-chat-thread-error button {
+  border-color: rgba(252, 165, 165, 0.45);
+  background: transparent;
+  color: #fca5a5;
+}
+
+.admin-page .admin-chat-page-navigation {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto 1rem;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-page .admin-chat-page-navigation button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.admin-page .admin-chat-page-navigation button:focus-visible {
+  outline-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}

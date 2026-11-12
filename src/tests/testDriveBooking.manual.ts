@@ -88,13 +88,21 @@ assert.equal(captured?.method, "POST");
 assert.equal(captured?.authorization, `Bearer ${token}`, "The signed-in session must travel with the booking");
 assert.equal(captured?.contentType, "application/json");
 
-assert.equal(captured?.body.user_id, "5", "The booking must be attached to the signed-in account");
+assert.equal(
+  Object.prototype.hasOwnProperty.call(captured?.body ?? {}, "user_id"),
+  false,
+  "user_id must not be sent: the endpoint attributes the booking from the bearer token",
+);
 assert.equal(captured?.body.car_id, "2");
 assert.equal(captured?.body.car_model, "BMW X5");
 assert.equal(captured?.body.date, "2026-09-27");
 assert.equal(captured?.body.time_slot, "09:00");
 assert.equal(captured?.body.user_name, "Verify User");
-assert.equal(captured?.body.user_email, "verify@example.com");
+assert.equal(
+  Object.prototype.hasOwnProperty.call(captured?.body ?? {}, "user_email"),
+  false,
+  "The confirmation address must come from the account, never from the request body",
+);
 assert.equal(captured?.body.user_phone, "+256700111222");
 assert.equal(captured?.body.notes, "Prefer a morning slot");
 
@@ -178,10 +186,3 @@ console.log(
     2,
   ),
 );
-
-assert.equal(captured?.body.date, "2026-09-27");
-assert.equal(captured?.body.time_slot, "09:00");
-assert.equal(captured?.body.user_name, "Verify User");
-assert.equal(captured?.body.user_email, "verify@example.com");
-assert.equal(captured?.body.user_phone, "+256700111222");
-assert.equal(captured?.body.notes, "Prefer a morning slot");

@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { formatUGX } from "@/features/cars/utils/formatUGX";
 
 export type DeleteVehicle = {
   id: number | string;
@@ -30,22 +31,6 @@ type DeleteConfirmModalProps = {
   onOpenChange: (open: boolean) => void;
   onConfirm: () => Promise<void> | void;
 };
-
-function formatUGX(amount?: number) {
-  if (amount === undefined) {
-    return "Price not available";
-  }
-
-  if (amount >= 1_000_000_000) {
-    return "UGX " + (amount / 1_000_000_000).toFixed(1) + "B";
-  }
-
-  if (amount >= 1_000_000) {
-    return "UGX " + (amount / 1_000_000).toFixed(0) + "M";
-  }
-
-  return "UGX " + amount.toLocaleString();
-}
 
 function getVehicleLabel(vehicle: DeleteVehicle) {
   return (
@@ -109,7 +94,7 @@ export function DeleteConfirmModal({
           </p>
 
           <p className="text-sm font-medium text-primary">
-            {formatUGX(vehicle.price)}
+            {vehicle.price === undefined ? "Price not available" : formatUGX(vehicle.price)}
           </p>
         </div>
 

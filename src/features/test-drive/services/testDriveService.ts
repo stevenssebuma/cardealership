@@ -88,14 +88,14 @@ export async function submitTestDriveBooking(
       Accept: "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
+    // Neither identity nor the confirmation address is sent: the endpoint takes
+    // the booking owner from the bearer token and mails the account address.
     body: JSON.stringify({
-      user_id: payload.customerId,
       car_id: payload.vehicleId,
       car_model: payload.vehicleName,
       date: payload.date,
       time_slot: payload.time,
       user_name: payload.customerName,
-      user_email: payload.customerEmail,
       user_phone: payload.phone,
       notes: payload.notes,
     }),

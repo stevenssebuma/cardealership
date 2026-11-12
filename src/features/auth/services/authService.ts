@@ -1,5 +1,5 @@
-import type { AuthError, AuthSession, AuthUser, LoginCredentials, RegisterCredentials, VerifySessionResult } from "../types";
-import { clearStoredSession, getAuthToken, getAuthenticatedUser, getStoredSession, saveSession } from "./authStorage";
+import type { AuthError, AuthErrorCode, AuthSession, AuthUser, LoginCredentials, RegisterCredentials, VerifySessionFailure, VerifySessionResult } from "../types";
+import { clearStoredSession, getAuthToken, getAuthenticatedUser, getSessionTarget, getStoredSession, saveSession } from "./authStorage";
 import { AuthApiError, verifySession as verifySessionRequest, login as loginApi, register as registerApi } from "./authApi";
 
 export { clearStoredSession, getAuthenticatedUser, getAuthToken, getStoredSession, saveSession };
@@ -12,9 +12,18 @@ export function clearAuthToken(): void {
   clearStoredSession();
 }
 
+/** Codes the server only returns when the token or account is genuinely invalid. */
+const DEFINITIVE_SESSION_REJECTIONS: AuthErrorCode[] = ["TOKEN_EXPIRED", "INVALID_TOKEN", "UNAUTHORIZED"];
+
 export async function verifySession(token: string, options: Parameters<typeof verifySessionRequest>[1] = {}): Promise<VerifySessionResult> {
   const result = await verifySessionRequest(token, options);
-  if (!result.valid) clearStoredSession();
+
+  // Only a definitive rejection erases the stored session. A network error,
+  // backend restart, 5xx or rate limit now keeps the stored session intact.
+  if (result.valid === false && DEFINITIVE_SESSION_REJECTIONS.includes((result as VerifySessionFailure).code)) {
+    clearStoredSession();
+  }
+
   return result;
 }
 
@@ -59,12 +68,20 @@ function toAuthFailure(error: unknown, fallbackMessage: string): AuthResult {
   };
 }
 
-export async function login(credentials: LoginCredentials): Promise<AuthResult> {
+export type LoginOptions = {
+  /**
+   * When false the session lives in sessionStorage and ends with the tab.
+   * Defaults to true, which keeps the existing persistent behaviour.
+   */
+  remember?: boolean;
+};
+
+export async function login(credentials: LoginCredentials, options: LoginOptions = {}): Promise<AuthResult> {
   try {
     const result = await loginApi(credentials.email, credentials.password);
     if (result.success && result.token && result.user) {
       const session = toAuthSession(result.token, result.user);
-      saveSession(session);
+      saveSession(session, getSessionTarget(options.remember ?? true));
       return { success: true, message: result.message, session };
     }
     return {

@@ -1,25 +1,13 @@
 import { useCars, useVehicleFilters } from "@/features/cars/hooks";
 import {
   VehicleInventorySection,
+  VehicleInventorySkeleton,
   VehicleSearchSection,
 } from "@/features/cars/components";
-import { LoadingSpinner } from "@/components/common/LoadingSpinner/LoadingSpinner";
 
 export function CarsPage() {
   const { vehicles, loading, error } = useCars();
   const filters = useVehicleFilters(vehicles);
-
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
-  if (error) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center px-6 text-center mt-20">
-        <p className="text-muted-foreground">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="mt-20">
@@ -31,24 +19,44 @@ export function CarsPage() {
           </p>
         </div>
       </section>
-      <VehicleSearchSection
-        searchMake={filters.searchMake}
-        setSearchMake={filters.setSearchMake}
-        searchYear={filters.searchYear}
-        setSearchYear={filters.setSearchYear}
-        priceRange={filters.priceRange}
-        setPriceRange={filters.setPriceRange}
-        showAdvanced={filters.showAdvanced}
-        setShowAdvanced={filters.setShowAdvanced}
-        filteredCount={filters.filteredVehicles.length}
-        resetFilters={filters.resetFilters}
-      />
-      <VehicleInventorySection
-        vehicles={filters.filteredVehicles}
-        filterByTab={filters.filterByTab}
-        showHeader={false}
-      />
+
+      {error ? (
+        <div role="alert" className="flex min-h-[40vh] items-center justify-center px-6 text-center">
+          <p className="text-muted-foreground">{error}</p>
+        </div>
+      ) : (
+        <>
+          <VehicleSearchSection
+            searchBrand={filters.searchBrand}
+            setSearchBrand={filters.setSearchBrand}
+            searchYear={filters.searchYear}
+            setSearchYear={filters.setSearchYear}
+            priceRange={filters.priceRange}
+            setPriceRange={filters.setPriceRange}
+            showAdvanced={filters.showAdvanced}
+            setShowAdvanced={filters.setShowAdvanced}
+            filteredCount={filters.filteredVehicles.length}
+            resetFilters={filters.resetFilters}
+            isLoading={loading}
+          />
+
+          {loading ? (
+            <section className="px-6 py-16 lg:px-8" aria-busy="true" aria-live="polite">
+              <div className="mx-auto max-w-7xl">
+                <span className="sr-only">Loading vehicle inventory…</span>
+                <VehicleInventorySkeleton />
+              </div>
+            </section>
+          ) : (
+            <VehicleInventorySection
+              vehicles={filters.filteredVehicles}
+              filterByTab={filters.filterByTab}
+              resetFilters={filters.resetFilters}
+              showHeader={false}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
-

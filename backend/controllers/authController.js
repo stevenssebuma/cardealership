@@ -24,6 +24,39 @@ function createToken(user) {
   );
 }
 
+/**
+ * Development sign-in mode.
+ *
+ * When AUTH_ALLOW_ANY_CREDENTIALS=true and NODE_ENV is not "production", any
+ * email/password pair signs in: a missing account is created on first use and an
+ * existing account skips the password check. Emails whose local part starts
+ * with "admin" get the admin role, which is what makes the /Admin dashboard
+ * reachable for demos. Hard-disabled in production.
+ */
+function isOpenSignInEnabled() {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
+  return String(process.env.AUTH_ALLOW_ANY_CREDENTIALS || "").toLowerCase() === "true";
+}
+
+function normalizeEmailLocalPart(email) {
+  return String(email || "").split("@")[0] || "";
+}
+
+function roleForEmail(email) {
+  return normalizeEmailLocalPart(email).toLowerCase().startsWith("admin")
+    ? "admin"
+    : "user";
+}
+
+function localPartToDisplayName(email) {
+  const name = normalizeEmailLocalPart(email).replace(/[._-]+/g, " ").trim();
+
+  return name || "Customer";
+}
+
 function publicUser(user) {
   return {
     id: user.id,
@@ -180,25 +213,75 @@ export async function login(req, res) {
       [normalizedEmail]
     );
 
+    const openSignIn = isOpenSignInEnabled();
+
     if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
+      if (!openSignIn) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      // Development sign-in: the first sign-in with an unknown address creates
+      // the account so demos never depend on pre-seeded users.
+      const hashedPassword = await bcrypt.hash(plainPassword, 12);
+
+      const created = await pool.query(
+        `
+          INSERT INTO users (
+            name,
+            email,
+            password,
+            role,
+            phone
+          )
+          VALUES ($1, $2, $3, $4, NULL)
+          RETURNING
+            id,
+            name,
+            email,
+            role,
+            phone,
+            created_at,
+            updated_at
+        `,
+        [
+          localPartToDisplayName(normalizedEmail),
+          normalizedEmail,
+          hashedPassword,
+          roleForEmail(normalizedEmail),
+        ]
+      );
+
+      const createdUser = publicUser(created.rows[0]);
+
+      console.log(
+        `Development sign-in created ${createdUser.role} account for ${createdUser.email}`
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Login successful",
+        token: createToken(createdUser),
+        user: createdUser,
       });
     }
 
     const databaseUser = result.rows[0];
 
-    const passwordMatches = await bcrypt.compare(
-      plainPassword,
-      databaseUser.password
-    );
+    if (!openSignIn) {
+      const passwordMatches = await bcrypt.compare(
+        plainPassword,
+        databaseUser.password
+      );
 
-    if (!passwordMatches) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid email or password",
-      });
+      if (!passwordMatches) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
     }
 
     const user = publicUser(databaseUser);

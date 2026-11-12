@@ -23,6 +23,8 @@ import {
 
 import request from "supertest";
 
+import { createBookingTestPool } from "./helpers/bookingTestPool.js";
+
 process.env.EMAIL_PROVIDER = "nodemailer";
 process.env.EMAIL_HOST = "smtp.integration.test";
 process.env.EMAIL_PORT = "587";
@@ -44,8 +46,14 @@ jest.unstable_mockModule("nodemailer", () => ({
   },
 }));
 
+// The booking routes and the reminder job both read/write the bookings table,
+// so the pool double has to keep state.
+const poolMock = createBookingTestPool();
+
 jest.unstable_mockModule("../config/db.js", () => ({
-  default: { query: async () => ({ rows: [] }), on: () => {} },
+  default: { query: poolMock.query, on: () => {} },
+  withTransaction: async (callback) =>
+    callback({ query: poolMock.query, release: () => {} }),
   verifyDatabaseConnection: async () => ({ connected: true }),
   initializeDatabase: async () => {},
 }));
@@ -56,11 +64,22 @@ function toDateString(date) {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * The reminder window is computed from the local wall-clock time of the slot
+ * (`parseAppointmentDateTime` builds a local Date), so a seeded appointment has
+ * to use the local calendar day. Mixing it with the UTC day made these tests
+ * fail whenever local time had already crossed midnight while UTC had not.
+ */
+function toLocalDateString(date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 function buildBookingPayload({ hoursAhead, overrides = {} }) {
   const appointment = new Date(Date.now() + hoursAhead * HOUR_IN_MS);
 
   return {
-    user_id: 1,
     car_id: 2,
     car_model: "Toyota Land Cruiser",
     date: toDateString(appointment),
@@ -72,22 +91,36 @@ function buildBookingPayload({ hoursAhead, overrides = {} }) {
   };
 }
 
+const customerIdentity = {
+  id: 1,
+  email: "sprint6.customer@pandamotors.test",
+  role: "user",
+};
+
+// A token issued before the email claim existed: proof that the pipeline still
+// degrades safely when the request carries no address at all.
+const identityWithoutEmail = { id: 1, role: "user" };
+
 let app;
 let httpServer;
-let bookingsCollection;
+let generateToken;
 let runTestDriveReminderCheck;
 let isWithinReminderWindow;
 let getHoursUntilAppointment;
 let parseAppointmentDateTime;
 
+function authorization(identity) {
+  return `Bearer ${generateToken(identity)}`;
+}
+
 beforeAll(async () => {
   const serverModule = await import("../server.js");
-  const databaseModule = await import("../config/database.js");
   const reminderJobModule = await import("../jobs/testDriveReminderJob.js");
+  const authMiddlewareModule = await import("../middleware/authMiddleware.js");
 
   app = serverModule.default;
   httpServer = serverModule.httpServer;
-  bookingsCollection = databaseModule.default.collection("bookings");
+  generateToken = authMiddlewareModule.generateToken;
   runTestDriveReminderCheck = reminderJobModule.runTestDriveReminderCheck;
   isWithinReminderWindow = reminderJobModule.isWithinReminderWindow;
   getHoursUntilAppointment = reminderJobModule.getHoursUntilAppointment;
@@ -108,6 +141,7 @@ describe("POST /api/bookings/create - immediate confirmation email", () => {
 
     const response = await request(app)
       .post("/api/bookings/create")
+      .set("Authorization", authorization(customerIdentity))
       .send(payload);
 
     expect(response.status).toBe(201);
@@ -131,6 +165,26 @@ describe("POST /api/bookings/create - immediate confirmation email", () => {
     expect(mailOptions.html).toContain(payload.time_slot);
   });
 
+  test("mails the account address even when the body names another recipient", async () => {
+    const payload = buildBookingPayload({
+      hoursAhead: 8 * 24,
+      overrides: {
+        car_id: 4,
+        user_email: "elsewhere.attacker@example.test",
+      },
+    });
+
+    const response = await request(app)
+      .post("/api/bookings/create")
+      .set("Authorization", authorization(customerIdentity))
+      .send(payload);
+
+    expect(response.status).toBe(201);
+    expect(response.body.booking.user_email).toBe(customerIdentity.email);
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    expect(sendMailMock.mock.calls[0][0].to).toBe(customerIdentity.email);
+  });
+
   test("skips the confirmation email safely when no customer email is provided", async () => {
     const payload = buildBookingPayload({
       hoursAhead: 6 * 24,
@@ -139,6 +193,7 @@ describe("POST /api/bookings/create - immediate confirmation email", () => {
 
     const response = await request(app)
       .post("/api/bookings/create")
+      .set("Authorization", authorization(identityWithoutEmail))
       .send(payload);
 
     expect(response.status).toBe(201);
@@ -158,6 +213,7 @@ describe("POST /api/bookings/create - immediate confirmation email", () => {
 
     const response = await request(app)
       .post("/api/bookings/create")
+      .set("Authorization", authorization(customerIdentity))
       .send(payload);
 
     expect(response.status).toBe(400);
@@ -168,7 +224,8 @@ describe("POST /api/bookings/create - immediate confirmation email", () => {
   test("still rejects a booking without the required fields", async () => {
     const response = await request(app)
       .post("/api/bookings/create")
-      .send({ car_id: 1, date: "2026-12-01", time_slot: "10:00" });
+      .set("Authorization", authorization(customerIdentity))
+      .send({ car_id: 1, date: "2026-12-01" });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("Missing required fields");
@@ -186,7 +243,7 @@ describe("24 hour reminder background checker", () => {
       carId: 4,
       carModel: "BMW X5",
       status: "confirmed",
-      date: toDateString(appointment),
+      date: toLocalDateString(appointment),
       timeSlot: `${String(appointment.getHours()).padStart(2, "0")}:${String(
         appointment.getMinutes()
       ).padStart(2, "0")}`,
@@ -194,7 +251,7 @@ describe("24 hour reminder background checker", () => {
       user_email: "reminder.customer@pandamotors.test",
     };
 
-    await bookingsCollection.insertOne(booking);
+    poolMock.seedBooking(booking);
 
     const firstRun = await runTestDriveReminderCheck({ now });
 
@@ -221,7 +278,7 @@ describe("24 hour reminder background checker", () => {
   test("does not email bookings outside the 24 hour window", async () => {
     const farAwayAppointment = new Date(Date.now() + 5 * 24 * HOUR_IN_MS);
 
-    await bookingsCollection.insertOne({
+    poolMock.seedBooking({
       userId: 6,
       carId: 7,
       carModel: "Lexus LX570",
@@ -242,12 +299,12 @@ describe("24 hour reminder background checker", () => {
     const appointment = new Date(Date.now() + 24 * HOUR_IN_MS);
     const now = new Date(appointment.getTime() - 24 * HOUR_IN_MS);
 
-    await bookingsCollection.insertOne({
+    poolMock.seedBooking({
       userId: 8,
       carId: 9,
       carModel: "Mercedes G-Wagon",
       status: "confirmed",
-      date: toDateString(appointment),
+      date: toLocalDateString(appointment),
       timeSlot: `${String(appointment.getHours()).padStart(2, "0")}:${String(
         appointment.getMinutes()
       ).padStart(2, "0")}`,

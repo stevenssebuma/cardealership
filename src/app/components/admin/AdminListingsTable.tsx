@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -8,7 +8,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../ui/table";
+} from "@/components/ui/table";
+import { MOCK_VEHICLES } from "@/features/cars/data/mockVehicles";
+import { formatUGX } from "@/features/cars/utils/formatUGX";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 
 type VehicleStatus = "Available" | "Pending Test Drive" | "Sold";
@@ -16,7 +18,7 @@ type VehicleStatus = "Available" | "Pending Test Drive" | "Sold";
 export type AdminVehicle = {
   id: number;
   name: string;
-  brand: string;
+  make: string;
   type: string;
   year: number;
   price: number;
@@ -34,62 +36,12 @@ type AdminListingsTableProps = {
   vehicles?: AdminVehicle[];
 };
 
-const DEFAULT_VEHICLES: AdminVehicle[] = [
-  {
-    id: 1,
-    name: "Land Cruiser V8",
-    brand: "Toyota",
-    type: "Luxury SUV",
-    year: 2023,
-    price: 285000000,
-    condition: "New",
-    status: "Available",
-    image: "",
-    specs: {
-      power: "309 HP",
-      engine: "4.5L V8",
-      drive: "4WD",
-    },
-  },
-  {
-    id: 2,
-    name: "S-Class S500",
-    brand: "Mercedes-Benz",
-    type: "Luxury Sedan",
-    year: 2023,
-    price: 360000000,
-    condition: "New",
-    status: "Available",
-    image: "",
-    specs: {
-      power: "429 HP",
-      engine: "3.0L V6T",
-      drive: "RWD",
-    },
-  },
-  {
-    id: 3,
-    name: "Range Rover Sport",
-    brand: "Land Rover",
-    type: "Sport Luxury SUV",
-    year: 2023,
-    price: 420000000,
-    condition: "New",
-    status: "Pending Test Drive",
-    image: "",
-    specs: {
-      power: "395 HP",
-      engine: "3.0L I6T",
-      drive: "AWD",
-    },
-  },
-];
-
-function formatUGX(amount: number) {
-  if (amount >= 1_000_000_000) return "UGX " + (amount / 1_000_000_000).toFixed(1) + "B";
-  if (amount >= 1_000_000) return "UGX " + (amount / 1_000_000).toFixed(0) + "M";
-  return "UGX " + amount.toLocaleString();
-}
+const DEFAULT_VEHICLES: AdminVehicle[] = MOCK_VEHICLES.map((vehicle) => ({
+  ...vehicle,
+  condition: vehicle.condition ?? "New",
+  status: (vehicle.status === "Available" || vehicle.status === "Sold" ? vehicle.status : "Available") as VehicleStatus,
+  image: vehicle.image ?? "",
+}));
 
 function getVehicleStatus(vehicle: AdminVehicle): VehicleStatus {
   if (vehicle.status) {
@@ -179,7 +131,7 @@ export function AdminListingsTable({ vehicles = DEFAULT_VEHICLES }: AdminListing
               return (
                 <TableRow key={listing.id}>
                   <TableCell className="font-medium">{listing.name}</TableCell>
-                  <TableCell>{listing.brand}</TableCell>
+                  <TableCell>{listing.make}</TableCell>
                   <TableCell>{listing.year}</TableCell>
                   <TableCell>{formatUGX(listing.price)}</TableCell>
                   <TableCell>{listing.condition}</TableCell>

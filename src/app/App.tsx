@@ -2,17 +2,17 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom
 import { AuthProvider } from "./context/auth";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
-import { AuthLayout } from "./layouts/AuthLayout";
 import { HashScrollHandler } from "./providers/HashScrollHandler";
 import { LoginPage } from "../pages/Login/LoginPage";
-import RegisterPage from "../pages/Register";
-import ProfilePage from "../pages/ProfilePage";
-import Admin from "../pages/Admin";
+import { RegisterPage } from "../pages/Register/RegisterPage";
+import ProfilePage from "../pages/Profile/ProfilePage";
+import AdminPage from "../pages/Admin/AdminPage";
 import { AdminChatPage } from "../pages/AdminChat/AdminChatPage";
 import { AdminChatProvider } from "../features/admin-chat/context/AdminChatContext";
-import TestTasks from "../pages/TestTasks/TestTasks";
+import TestTasksPage from "../pages/TestTasks/TestTasksPage";
 import { HomePage } from "../pages/Home/HomePage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
+import { CarsPage } from "../pages/Cars/CarsPage";
 import { useAuth } from "../features/auth/hooks";
 
 function AdminChatLayout() {
@@ -38,14 +38,15 @@ export default function App() {
             sign-in screen or a link from another page. */}
         <HashScrollHandler />
         <Routes>
-          <Route path="/test" element={<TestTasks />} />
+          <Route path="/test" element={<TestTasksPage />} />
+          {/* LoginPage is a full-bleed, two-column screen. It must not be
+              wrapped in AuthLayout, whose max-w-md card and site header squeeze
+              the page and push the form outside the card. */}
           <Route
             path="/login"
             element={
               <PublicOnlyRoute>
-                <AuthLayout>
-                  <LoginPage />
-                </AuthLayout>
+                <LoginPage />
               </PublicOnlyRoute>
             }
           />
@@ -59,10 +60,11 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Admin />} />
+            <Route index element={<AdminPage />} />
             <Route path="chat" element={<AdminChatPage />} />
           </Route>
           <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+          <Route path="/cars" element={<CarsPage />} />
           <Route path="/*" element={<HomePage />} />
         </Routes>
       </BrowserRouter>

@@ -26,11 +26,26 @@ export type ChatHistoryResult = {
   mock: boolean;
 };
 
+/**
+ * Chat data source selection.
+ *
+ * The backend chat contract is not confirmed yet, so the admin inbox is served
+ * from the synthetic fixtures. In development that has to be the default:
+ * requiring VITE_CHAT_API_MOCK_MODE=true meant an unset variable turned the
+ * whole inbox into "Conversations could not be loaded". Production always
+ * reports false, and an explicit "false" still opts a development build out.
+ */
 export function isChatApiMockMode(
   value: string | undefined = import.meta.env.VITE_CHAT_API_MOCK_MODE,
   isProduction: boolean = import.meta.env.PROD,
 ): boolean {
-  return isProduction === false && value === "true";
+  if (isProduction) return false;
+
+  const configured = value?.trim().toLowerCase();
+
+  if (!configured) return true;
+
+  return configured === "true";
 }
 
 function requireChatAccessToken(accessToken: string): void {

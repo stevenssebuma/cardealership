@@ -14,6 +14,8 @@ interface VehicleSearchSectionProps {
   setShowAdvanced: (value: boolean) => void;
   filteredCount: number;
   resetFilters: () => void;
+  /** True while inventory is still loading, so the count is not shown as 0. */
+  isLoading?: boolean;
 }
 
 export function VehicleSearchSection({
@@ -27,6 +29,7 @@ export function VehicleSearchSection({
   setShowAdvanced,
   filteredCount,
   resetFilters,
+  isLoading = false,
 }: VehicleSearchSectionProps) {
   return (
     <section className="border-y border-border bg-card px-4 py-12 sm:px-6 sm:py-14 lg:px-8">
@@ -39,7 +42,13 @@ export function VehicleSearchSection({
             <h2 className="text-2xl font-bold sm:text-3xl">Find your next vehicle</h2>
           </div>
           <p className="text-sm text-muted-foreground" aria-live="polite">
-            <span className="font-semibold text-foreground">{filteredCount}</span> vehicles
+            {isLoading ? (
+              "Loading stock…"
+            ) : (
+              <>
+                <span className="font-semibold text-foreground">{filteredCount}</span> vehicles
+              </>
+            )}
           </p>
         </div>
 

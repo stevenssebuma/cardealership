@@ -3,7 +3,7 @@ import {
   CalendarClock,
   RefreshCw,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -15,33 +15,163 @@ import { groupBookingHistory } from "../utils/bookingHistory";
 import type { BookingHistoryItem } from "../types";
 import "./BookingHistory.css";
 
-function BookingGroup({ items }: { items: BookingHistoryItem[] }) {
+const TABS = ["upcoming", "completed", "cancelled"] as const;
+type BookingTab = (typeof TABS)[number];
+
+const TAB_LABELS: Record<BookingTab, string> = {
+  upcoming: "Upcoming",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const EMPTY_GROUP_COPY: Record<BookingTab, string> = {
+  upcoming: "No upcoming test drives.",
+  completed: "No completed test drives yet.",
+  cancelled: "No cancelled test drives.",
+};
+
+function formatBookingDate(date: string) {
+  if (!date) return "Date to be confirmed";
+
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-UG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+type BookingRowProps = {
+  booking: BookingHistoryItem;
+  isConfirming: boolean;
+  isCancelling: boolean;
+  onAskCancel: (bookingId: string) => void;
+  onConfirmCancel: (bookingId: string) => void;
+  onKeep: () => void;
+};
+
+function BookingRow({
+  booking,
+  isConfirming,
+  isCancelling,
+  onAskCancel,
+  onConfirmCancel,
+  onKeep,
+}: BookingRowProps) {
+  const when = `${formatBookingDate(booking.date)}${
+    booking.time ? ` at ${booking.time}` : ""
+  }`;
+
+  return (
+    <Card>
+      <CardContent className="booking-item">
+        <div className="booking-item-copy">
+          <strong>{booking.vehicleName}</strong>
+          <p>
+            <time dateTime={booking.date || undefined}>{when}</time>
+          </p>
+        </div>
+
+        <span className={`booking-status booking-${booking.status}`}>
+          {booking.status}
+        </span>
+
+        {booking.canCancel && (
+          <div className="booking-actions">
+            {isConfirming ? (
+              <>
+                <button
+                  type="button"
+                  className="booking-cancel booking-cancel--confirm"
+                  /* The confirm step stays mounted while the request is in
+                     flight so the label can report progress; on success the
+                     refreshed list moves the row out of this tab. */
+                  onClick={() => onConfirmCancel(booking.id)}
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? "Cancelling…" : "Confirm"}
+                </button>
+                <button
+                  type="button"
+                  className="booking-cancel"
+                  onClick={onKeep}
+                  disabled={isCancelling}
+                >
+                  Keep
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="booking-cancel"
+                onClick={() => onAskCancel(booking.id)}
+                disabled={isCancelling}
+                aria-label={`Cancel the test drive for ${booking.vehicleName} on ${when}`}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BookingGroup({
+  tab,
+  items,
+  confirmingId,
+  pendingCancelId,
+  onAskCancel,
+  onConfirmCancel,
+  onKeep,
+}: {
+  tab: BookingTab;
+  items: BookingHistoryItem[];
+  confirmingId: string | null;
+  pendingCancelId: string | null;
+  onAskCancel: (bookingId: string) => void;
+  onConfirmCancel: (bookingId: string) => void;
+  onKeep: () => void;
+}) {
   if (items.length === 0) {
-    return <div className="booking-state">No bookings in this group.</div>;
+    return <div className="booking-state">{EMPTY_GROUP_COPY[tab]}</div>;
   }
 
   return (
     <div className="booking-list">
       {items.map((booking) => (
-        <Card key={booking.id}>
-          <CardContent className="booking-item">
-            <div>
-              <strong>{booking.vehicleName}</strong>
-              <p>{booking.date} at {booking.time}</p>
-            </div>
-            <span className={`booking-${booking.status}`}>
-              {booking.status}
-            </span>
-          </CardContent>
-        </Card>
+        <BookingRow
+          key={booking.id}
+          booking={booking}
+          isConfirming={confirmingId === booking.id}
+          isCancelling={pendingCancelId === booking.id}
+          onAskCancel={onAskCancel}
+          onConfirmCancel={onConfirmCancel}
+          onKeep={onKeep}
+        />
       ))}
     </div>
   );
 }
 
 export function BookingHistory() {
-  const { isLoading, result, refresh } = useBookingHistory();
-  const [activeTab, setActiveTab] = useState<"upcoming" | "completed" | "cancelled">("upcoming");
+  const {
+    isLoading,
+    result,
+    refresh,
+    cancelBooking,
+    pendingCancelId,
+    cancelError,
+    cancelNotice,
+  } = useBookingHistory();
+  const [activeTab, setActiveTab] = useState<BookingTab>("upcoming");
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const tabRefs = useRef<Record<BookingTab, HTMLButtonElement | null>>({
+    upcoming: null,
+    completed: null,
+    cancelled: null,
+  });
 
   if (isLoading) {
     return (
@@ -63,14 +193,14 @@ export function BookingHistory() {
     return (
       <Card className="profile-settings-wide">
         <CardContent className="booking-state booking-error">
-          <AlertCircle size={22} />
+          <AlertCircle size={22} aria-hidden="true" />
           <p>{failureMessage ?? "Booking history is unavailable."}</p>
           <button
             type="button"
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            className="booking-retry"
             onClick={() => void refresh()}
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={16} aria-hidden="true" />
             Retry
           </button>
         </CardContent>
@@ -80,11 +210,21 @@ export function BookingHistory() {
 
   const groups = groupBookingHistory(result.bookings);
 
+  const focusTab = (tab: BookingTab) => {
+    setActiveTab(tab);
+    tabRefs.current[tab]?.focus();
+  };
+
+  const moveTab = (current: BookingTab, direction: 1 | -1) => {
+    const index = TABS.indexOf(current);
+    focusTab(TABS[(index + direction + TABS.length) % TABS.length]);
+  };
+
   return (
     <Card className="profile-settings-wide">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarClock size={22} />
+        <CardTitle className="booking-title">
+          <CalendarClock size={22} aria-hidden="true" />
           Test-drive history
         </CardTitle>
         {result.mock && (
@@ -94,21 +234,81 @@ export function BookingHistory() {
         )}
       </CardHeader>
       <CardContent>
-        <div role="tablist" aria-label="Booking history">
-          {(["upcoming", "completed", "cancelled"] as const).map((tab) => (
+        {(cancelNotice || cancelError) && (
+          <div className="booking-feedback">
+            {cancelNotice && (
+              <p className="booking-notice" role="status">
+                {cancelNotice}
+              </p>
+            )}
+            {cancelError && (
+              <p className="booking-cancel-error" role="alert">
+                {cancelError}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div role="tablist" aria-label="Booking history" className="booking-tabs">
+          {TABS.map((tab) => (
             <button
               key={tab}
               type="button"
               role="tab"
+              id={`booking-tab-${tab}`}
+              className="booking-tab"
               aria-selected={activeTab === tab}
+              aria-controls={`booking-panel-${tab}`}
+              tabIndex={activeTab === tab ? 0 : -1}
+              ref={(element) => {
+                tabRefs.current[tab] = element;
+              }}
               onClick={() => setActiveTab(tab)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  moveTab(tab, 1);
+                  return;
+                }
+
+                if (event.key === "ArrowLeft") {
+                  event.preventDefault();
+                  moveTab(tab, -1);
+                  return;
+                }
+
+                if (event.key === "Home") {
+                  event.preventDefault();
+                  focusTab("upcoming");
+                  return;
+                }
+
+                if (event.key === "End") {
+                  event.preventDefault();
+                  focusTab("cancelled");
+                }
+              }}
             >
-              {tab[0].toUpperCase() + tab.slice(1)} ({groups[tab].length})
+              {TAB_LABELS[tab]} ({groups[tab].length})
             </button>
           ))}
         </div>
-        <div role="tabpanel">
-          <BookingGroup items={groups[activeTab]} />
+
+        <div
+          role="tabpanel"
+          id={`booking-panel-${activeTab}`}
+          aria-labelledby={`booking-tab-${activeTab}`}
+          className="booking-panel"
+        >
+          <BookingGroup
+            tab={activeTab}
+            items={groups[activeTab]}
+            confirmingId={confirmingId}
+            pendingCancelId={pendingCancelId}
+            onAskCancel={setConfirmingId}
+            onConfirmCancel={(bookingId) => void cancelBooking(bookingId)}
+            onKeep={() => setConfirmingId(null)}
+          />
         </div>
       </CardContent>
     </Card>

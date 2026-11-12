@@ -10,7 +10,7 @@
 // suite and by the manual script in tests/testDriveEmailPipeline.manual.js.
 
 import { randomUUID } from "node:crypto";
-import db from "../config/database.js";
+import pool from "../config/db.js";
 import { sendTestDriveReminder } from "../services/emailService.js";
 
 const DEFAULT_INTERVAL_MINUTES = 60;
@@ -137,10 +137,33 @@ export async function runTestDriveReminderCheck(options = {}) {
     results: [],
   };
 
-  const bookings = await db
-    .collection("bookings")
-    .find({ status: "confirmed" })
-    .toArray();
+  const result = await pool.query(`
+    SELECT
+      b.id,
+      b.status,
+      b.time_slot,
+      TO_CHAR(b.booking_date, 'YYYY-MM-DD') AS booking_date,
+      b.reminder_sent_at,
+      u.name AS user_name,
+      u.email AS user_email,
+      c.name AS car_model
+    FROM bookings b
+    LEFT JOIN users u ON u.id = b.user_id
+    LEFT JOIN cars c ON c.id = b.car_id
+    WHERE b.status = 'confirmed'
+    ORDER BY b.booking_date ASC
+  `);
+
+  const bookings = result.rows.map((row) => ({
+    id: row.id,
+    status: row.status,
+    date: row.booking_date,
+    timeSlot: row.time_slot,
+    carModel: row.car_model,
+    user_name: row.user_name,
+    user_email: row.user_email,
+    reminderSent: Boolean(row.reminder_sent_at),
+  }));
 
   report.scanned = bookings.length;
 
@@ -190,14 +213,11 @@ export async function runTestDriveReminderCheck(options = {}) {
         continue;
       }
 
-      await db.collection("bookings").updateOne(
-        { _id: booking._id },
-        {
-          $set: {
-            reminderSent: true,
-            reminderSentAt: now.toISOString(),
-          },
-        }
+      await pool.query(
+        `UPDATE bookings
+         SET reminder_sent_at = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $2`,
+        [now, booking.id]
       );
 
       report.sent += 1;

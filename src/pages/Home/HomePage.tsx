@@ -1,4 +1,4 @@
-import { Footer } from "../../app/components/Footer/Footer";
+import { Footer } from "../../components/common/Footer/Footer";
 import { Navbar } from "../../app/components/Navbar/Navbar";
 
 import { HeroSection } from "./components/HeroSection";
@@ -53,6 +53,8 @@ export function HomePage() {
         filteredCount={filters.filteredVehicles.length}
 
         resetFilters={filters.resetFilters}
+
+        isLoading={loading}
 
       />
 

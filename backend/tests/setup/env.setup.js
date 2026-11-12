@@ -18,6 +18,9 @@ process.env.NODE_ENV = process.env.NODE_ENV || "test";
 // Port 0 lets the operating system assign a free port during test runs.
 process.env.PORT = "0";
 process.env.TEST_DRIVE_REMINDER_ENABLED = "false";
+// The suite must verify the real password contract, never the development
+// "accept any credentials" shortcut that backend/.env enables locally.
+process.env.AUTH_ALLOW_ANY_CREDENTIALS = "false";
 
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = "integration-test-secret";

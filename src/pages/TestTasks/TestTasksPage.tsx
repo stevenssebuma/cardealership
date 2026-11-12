@@ -10,7 +10,7 @@ export default function TestTasks() {
     {
       id: 1,
       name: "Toyota Land Cruiser ZX",
-      brand: "Toyota",
+      make: "Toyota",
       type: "SUV",
       year: 2023,
       price: 380000000,
@@ -27,7 +27,7 @@ export default function TestTasks() {
     {
       id: 2,
       name: "BMW X5",
-      brand: "BMW",
+      make: "BMW",
       type: "SUV",
       year: 2022,
       price: 295000000,

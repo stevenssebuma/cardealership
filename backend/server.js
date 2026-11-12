@@ -22,6 +22,15 @@ import authRoutes from './routes/authRoutes.js';
 import sessionRoutes from './routes/sessionRoutes.js';
 import mfaRoutes from './routes/mfaRoutes.js';
 import testDriveRoutes from './routes/testDriveRoutes.js';
+import carsRoutes from './routes/carsRoutes.js';
+
+// Transactional email contract used by the test drive confirmation pipeline
+import { getTestDriveEmailPipelineStatus } from './services/emailService.js';
+import {
+    getEmailProvider,
+    getMissingEmailEnvironmentKeys,
+    isEmailProviderConfigured,
+} from './config/email.js';
 
 // Import performance middleware
 import { performanceMiddleware } from './middleware/performanceMiddleware.js';
@@ -131,6 +140,9 @@ app.use('/api/mfa', mfaRoutes);
 // Test drive booking routes (Sprint 3 integration point used by the
 // Sprint 6 automated email pipeline)
 app.use('/api/test-drives', testDriveRoutes);
+
+// Vehicle inventory routes (public GET, administrator-only writes)
+app.use('/api/cars', carsRoutes);
 
 
 // ============================================
@@ -547,13 +559,13 @@ app.get('/api/health', (req, res) => {
 
             'GET /api/dealership/status - Check if open',
 
-            'POST /api/bookings/create - Book test drive',
+            'POST /api/bookings/create - Book test drive (signed-in customer)',
 
             'GET /api/bookings/check-availability - Check availability',
 
-            'GET /api/bookings/user/:user_id - Get user bookings',
+            'GET /api/bookings/user/:user_id - Get your own bookings',
 
-            'PUT /api/bookings/:id/cancel - Cancel booking',
+            'PUT /api/bookings/:id/cancel - Cancel your own booking',
 
             'GET /api/admin/stats - Full admin statistics',
 
@@ -585,7 +597,7 @@ app.get('/api/health', (req, res) => {
 // ============================================
 
 try {
-    const { default: pool, verifyDatabaseConnection } =
+    const { verifyDatabaseConnection, initializeDatabase } =
         await import("./config/db.js");
 
     const result = await verifyDatabaseConnection();
@@ -598,18 +610,9 @@ try {
 
     console.log("PostgreSQL database connection verified");
 
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            role VARCHAR(50) NOT NULL DEFAULT 'user',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-    `);
-
-    console.log("Users table verified");
+    // Creates/updates the users table (including name and phone columns)
+    // used by the auth controller.
+    await initializeDatabase();
 
     console.log("Database initialization complete");
 } catch (error) {
@@ -625,6 +628,69 @@ app.get("/", (req, res) => {
     });
 });
 
+
+// ============================================
+// TRANSACTIONAL EMAIL DIAGNOSTICS
+// ============================================
+
+/**
+ * Reports which transport the booking pipeline will use and names the missing
+ * environment keys when the configured provider is not ready. Credentials are
+ * never printed, only whether they are present.
+ */
+function logTransactionalEmailStatus() {
+    const provider = getEmailProvider();
+    const status = getTestDriveEmailPipelineStatus();
+
+    const configured = isEmailProviderConfigured(provider);
+
+    console.log('--- Transactional email ---');
+    console.log(
+        `Provider: ${status.provider}${status.usesFallbackTransport ? ' (Ethereal fallback)' : ''}`
+    );
+    console.log(`From: ${status.from || 'not set'}`);
+    console.log(`Credentials: ${configured ? 'present' : 'missing'}`);
+
+    if (!configured) {
+        const missingKeys = getMissingEmailEnvironmentKeys(provider);
+
+        console.log(
+            `WARNING: EMAIL_PROVIDER=${provider} is missing: ${missingKeys.join(', ')}`
+        );
+        console.log(
+            'WARNING: confirmation and reminder emails stay undelivered until these are set in backend/.env.'
+        );
+        console.log(
+            'Run: npm run email:verify -- --to=<address>'
+        );
+    }
+}
+
+// ============================================
+// SIGN-IN POLICY DIAGNOSTICS
+// ============================================
+
+/**
+ * Open sign-in (any email/password) is a development convenience. Print it so
+ * nobody mistakes a permissive local setup for production behaviour.
+ */
+function logSignInPolicy() {
+    const openSignIn =
+        process.env.NODE_ENV !== 'production' &&
+        String(process.env.AUTH_ALLOW_ANY_CREDENTIALS || '').toLowerCase() === 'true';
+
+    console.log('--- Sign-in policy ---');
+
+    if (openSignIn) {
+        console.log(
+            'Open sign-in: ENABLED (any email/password signs in; unknown emails become accounts)'
+        );
+        console.log('Admin role: granted to emails whose local part starts with "admin"');
+        return;
+    }
+
+    console.log('Open sign-in: disabled (only registered accounts with matching passwords)');
+}
 
 // ============================================
 // START THE SERVER
@@ -653,6 +719,12 @@ export const httpServer = app.listen(PORT, async () => {
         );
     }
 
+    // Email delivery state for booking confirmations and reminders.
+    if (process.env.NODE_ENV !== 'test') {
+        logTransactionalEmailStatus();
+        logSignInPolicy();
+    }
+
     console.log('\nAvailable Endpoints:');
 
     console.log('   --- Financial ---');
@@ -674,7 +746,7 @@ export const httpServer = app.listen(PORT, async () => {
     console.log('   --- Test Drive Booking ---');
 
     console.log(
-        `   POST /api/bookings/create - Book test drive with conflict logic`
+        `   POST /api/bookings/create - Book test drive for the token owner (requires a Bearer token)`
     );
 
     console.log(

@@ -21,6 +21,8 @@ export interface BookingHistoryItem {
   date: string;
   time: string;
   status: "upcoming" | "completed" | "cancelled";
+  /** Upcoming bookings can be cancelled by their owner; settled ones cannot. */
+  canCancel: boolean;
 }
 
 export interface ProfileState {
@@ -93,3 +95,13 @@ export type BookingHistoryResult =
       code: "UNAUTHORIZED" | "BOOKING_HISTORY_FAILED";
       message: string;
     };
+
+export type BookingCancelErrorCode =
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "ALREADY_CANCELLED"
+  | "CANCEL_FAILED";
+
+export type BookingCancelResult =
+  | { success: true; message: string }
+  | { success: false; code: BookingCancelErrorCode; message: string };
