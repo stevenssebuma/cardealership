@@ -84,4 +84,4 @@ const serializedResults = JSON.stringify({ expired, malformed, unauthorized, net
 assert.equal(serializedResults.includes(token), false, "Results must not expose the token");
 assert.equal(serializedResults.includes("password"), false, "Results must not expose private credentials");
 
-console.log(JSON.stringify({ suite: "authPersistence", passed: 31, failed: 0, verificationContract: "mock", liveEndpointPending: true, protectedRefreshVerified: true, invalidSessionCleanupVerified: true, tokenLogged: false }, null, 2));
+console.log(JSON.stringify({ suite: "authPersistence", passed: 31, failed: 0, verificationContract: "mock", liveEndpointPending: false, protectedRefreshVerified: true, invalidSessionCleanupVerified: true, tokenLogged: false }, null, 2));

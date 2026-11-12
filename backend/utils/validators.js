@@ -1,10 +1,12 @@
 // backend/utils/validators.js
 const BUSINESS_HOURS = { start: 9, end: 18, days: [1, 2, 3, 4, 5, 6] };
-export const VALID_TIME_SLOTS = [
-  '09:00-10:00', '10:00-11:00', '11:00-12:00',
-  '12:00-13:00', '13:00-14:00', '14:00-15:00',
-  '15:00-16:00', '16:00-17:00', '17:00-18:00'
+// The scheduler offers start times ("09:00"), so a booking slot is the hour it
+// starts. Keep this as the single source of truth for the booking endpoints.
+export const BOOKING_TIME_SLOTS = [
+  '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'
 ];
+
+export const VALID_TIME_SLOTS = BOOKING_TIME_SLOTS;
 
 export function validateBookingDate(dateString) {
   const errors = [];

@@ -1,5 +1,9 @@
 # Sprint 10 Build and Test Report
 
+> **Snapshot of this sprint.** The build and test numbers below are the record of Sprint 10, not the
+> current suite. Current backend runner: `cd backend && npm test` → 6 suites / 62 tests. Booking
+> contract: [../sprint6/sprint6-validation-report.md](../sprint6/sprint6-validation-report.md) § Task 3.
+
 ## Validation scope
 
 This report records the verified frontend build, deterministic frontend tests, backend build and syntax checks, backend integration tests, startup behavior, database readiness, required API results, warnings, and external blockers.

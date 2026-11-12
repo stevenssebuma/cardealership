@@ -1,309 +1,3 @@
-# Car Dealership
-
-A full-stack vehicle dealership application with inventory browsing, authentication, test-drive scheduling, administration features, reporting, and supporting operational tools.
-
-## Technology stack
-
-- Frontend: React, TypeScript, and Vite.
-- Backend: Node.js and Express.
-- Database: PostgreSQL through the `pg` package and the repository database adapter.
-- Authentication: JSON Web Tokens and bcrypt password hashing.
-- Package manager: npm with separate frontend and backend lockfiles.
-
-## Repository structure
-
-```text
-.
-|-- src/                       Frontend application and manual tests
-|-- backend/                   Express API and backend services
-|-- backend/routes/            Express route definitions
-|-- backend/controllers/       Request handlers
-|-- backend/config/            Database and service configuration
-|-- backend/tests/             Backend validation files
-|-- docs/sprint10/             Sprint 10 audit and planning records
-|-- package.json               Frontend scripts and dependencies
-|-- backend/package.json       Backend scripts and dependencies
-`-- .env.example               Public frontend configuration example
-```
-
-## Prerequisites
-
-- Node.js and npm.
-- PostgreSQL available locally or through an approved development environment.
-- A configured backend JWT secret.
-- Separate frontend and backend environment files created from the tracked examples.
-
-## Frontend installation
-
-From the repository root:
-
-```bash
-npm install
-```
-
-Start frontend development:
-
-```bash
-npm run dev
-```
-
-Vite normally serves the frontend at `http://localhost:5173`.
-
-## Backend installation
-
-From the repository root:
-
-```bash
-cd backend
-npm install
-```
-
-Start the backend:
-
-```bash
-npm run dev
-```
-
-The backend defaults to `http://localhost:5500` when `PORT` is not overridden.
-
-## Frontend environment setup
-
-Copy the frontend example into an ignored local environment file:
-
-```bash
-cp .env.example .env.local
-```
-
-For local development, set:
-
-```dotenv
-VITE_API_BASE_URL=http://localhost:5500
-```
-
-Only public `VITE_` variables belong in frontend environment files. Never place database credentials, JWT secrets, email credentials, private keys, or service secrets in frontend variables.
-
-## Backend environment setup
-
-Create the local backend environment file:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-At minimum, configure:
-
-```dotenv
-PORT=5500
-DATABASE_URL=postgresql://database-user:database-password@localhost:5432/car_dealership
-JWT_SECRET=replace-with-a-long-random-secret
-SITE_URL=http://localhost:5173
-```
-
-Keep the real `.env` file untracked.
-
-## Database requirements
-
-The backend requires PostgreSQL for persistent users, inventory, and database-backed features. Create the configured database and grant the configured account the required privileges before starting live API validation.
-
-Database-dependent endpoints must not be reported as working when PostgreSQL is unavailable. Record database connection failures as environment blockers.
-
-## Development startup order
-
-1. Install root frontend dependencies.
-2. Install dependencies inside `backend/`.
-3. Create local frontend and backend environment files.
-4. Start PostgreSQL.
-5. Start the backend from `backend/`.
-6. Start the frontend from the repository root.
-7. Run manual API requests and deterministic tests.
-
-## API base URL
-
-The default local API origin is:
-
-```text
-http://localhost:5500
-```
-
-The examples below use this origin.
-
-## Sprint 10 required API endpoints
-
-### POST /api/auth/register
-
-Registers a user and returns a signed token with the created user summary.
-
-Required fields are `name`, `email`, and `password`. The optional `role` accepts `user` or `admin`; unsupported values are normalized to `user` by the current controller.
-
-```http
-POST http://localhost:5500/api/auth/register
-Content-Type: application/json
-
-{
-  "name": "API Test User",
-  "email": "api-test-user@example.com",
-  "password": "replace-with-a-test-password",
-  "role": "user"
-}
-```
-
-Successful registration returns HTTP `201` with `success`, `message`, `token`, and `user`. Missing required fields return HTTP `400`. An existing email returns HTTP `409`. Unexpected processing failures return HTTP `500`.
-
-### POST /api/auth/login
-
-Authenticates an existing user and returns a signed token with the verified user summary.
-
-```http
-POST http://localhost:5500/api/auth/login
-Content-Type: application/json
-
-{
-  "email": "api-test-user@example.com",
-  "password": "replace-with-a-test-password"
-}
-```
-
-Successful login returns HTTP `200` with `success`, `message`, `token`, and `user`. Missing fields return HTTP `400`. Unknown users and incorrect passwords return HTTP `401` with the same invalid-credential message.
-
-### GET /api/cars
-
-Returns the public vehicle inventory. Authentication is not required.
-
-```http
-GET http://localhost:5500/api/cars
-```
-
-The current backend controller does not consume query parameters for this endpoint. Filtering and sorting may be performed by frontend behavior, but unsupported server query parameters must not be documented as backend features.
-
-A successful response returns HTTP `200` with `success`, `count`, and `cars`. An empty inventory returns `count: 0` and an empty `cars` array. Database or repository failures return HTTP `500` with error code `FETCH_CARS_FAILED`.
-
-### POST /api/test-drives
-
-Validates and confirms a test-drive request. This route is currently public.
-
-Required values are customer name, customer email, either vehicle name or vehicle ID, appointment date, and appointment time. `phone` and `notes` are accepted as optional values. The controller accepts `name` or `customerName`, `email` or `customerEmail`, `date` or `appointmentDate`, and `time` or `appointmentTime`.
-
-```http
-POST http://localhost:5500/api/test-drives
-Content-Type: application/json
-
-{
-  "customerName": "API Test User",
-  "customerEmail": "api-test-user@example.com",
-  "phone": "+256700000000",
-  "vehicleId": "1",
-  "vehicleName": "Selected vehicle",
-  "appointmentDate": "2026-10-01",
-  "appointmentTime": "10:00",
-  "notes": "Manual Sprint 10 API test"
-}
-```
-
-Successful validation returns HTTP `201` with a generated reference, `confirmed` status, booking details, and notification outcome. Missing required values return HTTP `400` with an `errors` array.
-
-The current controller creates a confirmation response but does not yet persist the booking or enforce schedule conflicts. Notification failure does not cancel confirmation; notification status is returned separately.
-
-### GET /api/admin/stats
-
-Returns administrative totals and grouped statistics. The endpoint requires a valid JWT whose payload has the `admin` role.
-
-```http
-GET http://localhost:5500/api/admin/stats
-Authorization: Bearer replace-with-admin-access-token
-```
-
-A successful response returns `success`, a `stats` object, and a timestamp. The statistics include revenue, bookings, inventory count, average price, sales, users, recent bookings, grouped bookings, monthly sales, recent sales, and currency.
-
-A missing, invalid, or expired token returns HTTP `401`. A valid non-admin token returns HTTP `403`. Data-access failures return HTTP `500`.
-
-## Authentication and administrator authorization
-
-Protected endpoints expect:
-
-```text
-Authorization: Bearer access-token
-```
-
-Authentication verifies the JWT and attaches its payload to the request. Administrator routes additionally require `role: admin` in the verified token payload.
-
-Never commit real access tokens. Use temporary local tokens obtained through the login endpoint.
-
-## Manual API testing
-
-Manual HTTP request files are available at:
-
-- `src/requests.http`
-- `src/tests/cars.http`
-- `src/tests/test-drives.http`
-
-Open a request file in an HTTP-client-enabled editor, confirm the local API origin, start PostgreSQL and the backend, then execute requests individually. Replace placeholders locally without committing credentials.
-
-## Automated validation commands
-
-Run the frontend regression suite:
-
-```bash
-npm run test:regression
-```
-
-Run API configuration validation:
-
-```bash
-npm run test:api-config
-```
-
-Run the backend image-cleanup validation:
-
-```bash
-npm --prefix backend run test:car-image-cleanup
-```
-
-## Production build
-
-Build the frontend from the repository root:
-
-```bash
-npm run build
-```
-
-Run the backend syntax build gate:
-
-```bash
-npm --prefix backend run build
-```
-
-Preview the frontend build:
-
-```bash
-npm run preview
-```
-
-## Troubleshooting
-
-- Connection refused: confirm PostgreSQL and the backend are running and verify port `5500`.
-- Frontend requests target the wrong server: set `VITE_API_BASE_URL=http://localhost:5500` and restart Vite.
-- Unauthorized response: obtain a fresh token through login and use the Bearer scheme.
-- Forbidden administrator response: use a verified administrator account.
-- Database errors: verify `DATABASE_URL` or the documented `DB_` variables.
-- Email notification skipped: confirm the configured provider and email credentials.
-- Build failure: run installation separately in the root and `backend/` directories.
-
-## Security notes
-
-- Never commit `.env` files containing credentials.
-- Never expose `JWT_SECRET`, database passwords, email passwords, private keys, or provider secrets in frontend variables.
-- Never commit real Bearer tokens in HTTP examples.
-- Use a strong deployment-managed JWT secret.
-- Use approved CORS origins in production.
-- Keep PostgreSQL credentials least-privileged.
-- The current authentication middleware contains a development fallback secret when `JWT_SECRET` is absent. Production environments must always provide `JWT_SECRET`.
-
----
-
-## Earlier sprint implementation notes
-
-The historical sections below are retained for implementation context. The Sprint 10 setup and API documentation above is the authoritative contributor setup flow.
-
 
   # Car Dealership Website
 
@@ -315,41 +9,33 @@ The historical sections below are retained for implementation context. The Sprin
 
   Run `npm run dev` to start the development server.
 
-## Sprint 9 backend integrations
+  ## Local development database
 
+  The API needs PostgreSQL. `backend/.env` points `DATABASE_URL` at a local cluster
+  (the previously used managed instance is kept as a commented line).
 
+  ```text
+  host 127.0.0.1   port 5433   database cardealership   user postgres (trust auth)
+  data directory   C:\Users\y\.kombai\dev-pg
+  ```
 
-Sprint 9 adds a resilient exchange-rate API and a secured bulk vehicle-image upload endpoint.
+  ```powershell
+  # start / stop the local cluster
+  & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D "C:\Users\y\.kombai\dev-pg" -o "-p 5433 -c listen_addresses=localhost" start
+  & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D "C:\Users\y\.kombai\dev-pg" stop
+  ```
 
+  ```text
+  cd backend
+  npm run seed:inventory   # creates the schema and 6 demo vehicles (idempotent)
+  node reset-admin.js      # development admin: admin@dealership.com
+  npm run seed:bookings    # demo test-drive bookings for the admin dashboard
+  npm start                # API on http://localhost:5500
+  ```
 
-
-- Exchange-rate handoff: `docs/sprint9/exchange-rate-integration-handoff.md`
-
-- Bulk-upload handoff: `docs/sprint9/bulk-image-upload-integration-handoff.md`
-
-- Bulk-upload API contract: `docs/sprint9/bulk-image-upload-api-contract.md`
-
-- Dependency register: `docs/sprint9/sprint9-dependency-register.md`
-
-- Validation report: `docs/sprint9/sprint9-validation-report.md`
-
-
-
-Run the complete Sprint 9 backend test suite:
-
-
-
-```bash
-
-cd backend
-
-npm run test:sprint9
-
-```
-
-
-
-Use `backend/.env.example` for supported environment variable names. Do not commit runtime environment values.
+  TLS is decided from the connection string: managed hosts get SSL automatically and
+  localhost runs without it. Use `DATABASE_SSL=true` to force SSL on, or
+  `sslmode=require` in the URL. `GET /api/cars` serves the inventory.
   ---
 
 ---
@@ -485,15 +171,131 @@ Validation commands:
 
 ```text
 npm run test:api-config
-VITE_API_BASE_URL=https://approved-production-api.example.com npm run build
+
+# Vite loads .env / .env.production automatically, so the override is not tied to
+# any particular shell. Add the approved origin to an ignored environment file:
+#   VITE_API_BASE_URL=https://approved-production-api.example.com
+npm run build
+
+# One-off overrides, if you would rather not create an environment file:
+#   PowerShell:  $env:VITE_API_BASE_URL="https://approved-production-api.example.com"; npm run build
+#   bash / zsh:  VITE_API_BASE_URL=https://approved-production-api.example.com npm run build
 ```
 
-Chat mock modes are disabled by default. Synthetic chat requires explicit local opt-in and cannot be selected in a production build. Live gateway integration remains unavailable until the transport owner publishes the approved protocol.
+Project demonstration:
 
-## Sprint 8 Validation
+https://youtu.be/HNtln75HTEg
 
-Run `npm run test:sprint8-full` for the complete Sprint 8 targeted and affected regression suites. Production builds must disable every mock mode, use the approved HTTPS API origin, and restore generated `dist` assets after inspection. Detailed evidence is available in `docs/sprint8/sprint8-validation-report.md`.
+---
 
-## Sprint 8 Administrator Workflows
+## Local sign-in (development only)
 
-The administrator vehicle-listing wizard, dispatch board, and responsive sign-in experience are covered by `npm run test:sprint8-full` and `npm run test:login-interface`. Deployment requirements, blocked integration-owner dependencies, rollback guidance, and the reviewer summary are maintained under `docs/sprint8/`.
+`backend/.env` sets `AUTH_ALLOW_ANY_CREDENTIALS=true`, which makes `POST /api/auth/login`
+accept any email and password while `NODE_ENV` is not `production`:
+
+- an unknown address creates the account on first sign-in (name derived from the address);
+- an existing account skips the stored password check;
+- addresses whose local part starts with `admin` (`admin@dealership.com`, `admin@pandamotors.co.ug`, ...) are created with the `admin` role, so `/Admin` is reachable for demos.
+
+The server prints the active policy under `--- Sign-in policy ---` at startup. Set the flag to
+`false` to restore normal credential checks; it is ignored entirely in production, and the
+integration suite forces it off so `rejects a wrong password` keeps testing the real contract.
+
+Seeded admin: `admin@dealership.com` / `admin123` (`backend/reset-admin.js`).
+
+## Sprint 6 Automated Test Drive Email Pipeline
+
+The test drive booking lifecycle now sends transactional email automatically:
+
+- An immediate confirmation receipt is sent from `POST /api/bookings/create` through `backend/services/emailService.js`.
+- The booking is attributed to the account that owns the bearer token. The request requires a signed-in session (`401` otherwise) and any `user_id` in the body is ignored, so a client cannot book in another customer's name or spend their booking allowance.
+- `GET /api/bookings/user/:user_id` and `PUT /api/bookings/:id/cancel` are token-scoped too: a customer only reaches their own history and can only cancel their own booking (`403` for anyone else's; admins may act on any booking). `GET /api/bookings/check-availability` stays public.
+- The confirmation email always goes to the account address on the token. A `user_email` in the body is ignored, so the endpoint cannot be used to mail arbitrary recipients.
+- A background checker (`backend/jobs/testDriveReminderJob.js`) emails a reminder when an appointment is approximately 24 hours away and marks the booking with `reminderSent` so a reminder is never duplicated.
+- Both sends are non-blocking: a booking is always saved even when email delivery fails, and the pipeline is skipped safely (never throwing) when no provider is configured.
+
+Provider resolution order (see `backend/services/emailService.js` and `backend/config/email.js`):
+
+```text
+EMAIL_PROVIDER=nodemailer with EMAIL_HOST/EMAIL_PORT/EMAIL_USER/EMAIL_PASSWORD/EMAIL_FROM
+  -> fall back to the Ethereal test account (ETHEREAL_USER / ETHEREAL_PASSWORD)
+  -> otherwise skip the send safely
+```
+
+A provider counts as configured only when **every** required key is non-empty. Missing
+`EMAIL_USER` / `EMAIL_PASSWORD` silently push delivery onto the Ethereal fallback, whose test
+account expires, which is what a `535 Authentication failed` log line means.
+
+Credentials live in the gitignored `backend/.env` (never in `.env.example`):
+
+```text
+EMAIL_PROVIDER=nodemailer
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=<mailbox>@<domain>
+EMAIL_PASSWORD=<app password>
+EMAIL_FROM="Panda Motors <mailbox>@<domain>"
+EMAIL_REPLY_TO=sales@pandamotors.co.ug
+```
+
+Gmail rejects the account password over SMTP: enable 2-Step Verification, then create an App
+Password and paste that. `EMAIL_FROM` must belong to the authenticated mailbox or Gmail rewrites
+the sender. For any other provider use its own host/port and SMTP credentials.
+
+Verify the mailbox before booking against real data:
+
+```text
+cd backend
+npm run email:verify                                # prints provider + SMTP handshake result
+npm run email:verify -- --to=you@example.com        # sends one real confirmation email
+```
+
+Exit codes: `0` ready, `1` a required environment key is missing, `2` SMTP rejected the
+connection or credentials. The server also prints the resolved provider and the missing keys on
+startup, so a misconfiguration is visible without reading the booking log.
+
+Reminder checker settings (`backend/.env`):
+
+```text
+TEST_DRIVE_REMINDER_ENABLED=true
+TEST_DRIVE_REMINDER_INTERVAL_MINUTES=60
+TEST_DRIVE_REMINDER_WINDOW_HOURS=24
+TEST_DRIVE_REMINDER_DRY_RUN=false
+```
+
+The window is deliberately one hour wide on either side of the target (23h to 25h) so an hourly run can never step over an appointment.
+
+Manual validation:
+
+```text
+cd backend
+npm run test:test-drive-emails
+```
+
+### Sprint 6 API Integration Testing Suite
+
+Backend integration tests use Jest + Supertest against the real Express application (routes, middleware and JWT signing) while the PostgreSQL pool is replaced with an in-memory double, so the suite runs without a live database or email provider.
+
+Covered scenarios:
+
+- Registering a new user succeeds and never returns the password hash.
+- Registration validation responses (`400`, `409`) stay intact.
+- Logging in returns a signed JWT with the expected claims.
+- Invalid credentials are rejected with `401`.
+- Admin routes fail without a token (`401`), with an invalid token (`401`) and with a customer token (`403`), and succeed with an admin token.
+- Profile endpoints used by the profile page (`GET`/`PATCH /api/users/me`) require a valid session.
+- Booking a test drive triggers exactly one confirmation email.
+- The reminder sweep sends exactly one reminder 24 hours before an appointment and never duplicates it.
+
+Commands:
+
+```text
+cd backend
+npm test                      # full suite
+npm run test:auth-integration # auth, admin protection, profile routes
+npm run test:email-integration# booking confirmation + reminder pipeline
+```
+
+The suite also runs in CI through `.github/workflows/backend-integration-tests.yml` on pull requests targeting `main`.
+

@@ -1,9 +1,11 @@
-import { Calendar, CheckCircle2, LogIn } from "lucide-react";
-import { Button } from "../../../components/ui/button";
-import { Card, CardContent } from "../../../components/ui/card";
-import { Input } from "../../../components/ui/input";
-import { Label } from "../../../components/ui/label";
+import { Calendar, CheckCircle2, Clock, LogIn } from "lucide-react";
+import { Link } from "react-router";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useTestDrive } from "../hooks";
+import { getConfirmationEmailMessage } from "../utils/confirmationMessage";
 import { AvailabilitySlotPicker } from "./AvailabilitySlotPicker";
 import type { TestDriveVehicleOption } from "../types";
 
@@ -11,17 +13,10 @@ interface TestDriveSchedulerProps {
   vehicles: TestDriveVehicleOption[];
 }
 
-function getVehicleLabel(vehicle: TestDriveVehicleOption | undefined) {
-  if (!vehicle) {
-    return "selected vehicle";
-  }
-
-  return [vehicle.make, vehicle.model, vehicle.name].filter(Boolean).join(" ");
-}
-
 export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
   const {
     today,
+    isAuthenticated,
     selectedVehicleId,
     setSelectedVehicleId,
     date,
@@ -35,6 +30,7 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
     error,
     authMessage,
     success,
+    confirmation,
     submitting,
     selectedVehicle,
     availability,
@@ -43,41 +39,49 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
   } = useTestDrive(vehicles);
 
   return (
-    <section id="test-drive" className="py-24 px-6 lg:px-8 bg-background">
+    <section id="test-drive" className="bg-background px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <p className="text-primary text-sm font-bold tracking-[0.3em] mb-4 uppercase">
             Book Your Slot
           </p>
-
-          <h3 className="text-5xl md:text-6xl font-bold mb-4">
-            SCHEDULE A TEST DRIVE
-          </h3>
-
-          <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
-            Pick your preferred vehicle, choose a valid date and time, and our
-            team will help reserve your showroom test drive.
+          <h3 className="mb-4 text-3xl font-bold sm:text-4xl md:text-5xl">SCHEDULE A TEST DRIVE</h3>
+          <p className="mx-auto max-w-3xl text-base text-muted-foreground sm:text-lg">
+            Pick your preferred vehicle, choose a valid date and time, and our team will help
+            reserve your showroom test drive.
           </p>
         </div>
+
+        {!isAuthenticated && (
+          <div className="mb-8 flex flex-col items-start gap-3 rounded-lg border border-primary/30 bg-primary/10 p-5 text-sm md:flex-row md:items-center">
+            <LogIn className="text-primary md:mt-0.5" size={20} />
+            <p className="flex-1">
+              Test drives are reserved against a customer account. Sign in or create one and
+              you will be brought straight back to this scheduler.
+            </p>
+            <Button asChild className="bg-primary text-white hover:bg-primary/90">
+              <Link to="/login?redirect=%2F%23test-drive">Sign In To Book</Link>
+            </Button>
+          </div>
+        )}
 
         <Card className="border-border overflow-hidden">
           <CardContent className="p-6 md:p-8">
             {success ? (
               <div className="text-center py-10">
-                <CheckCircle2
-                  className="mx-auto mb-5 text-green-600"
-                  size={64}
-                />
-
-                <h4 className="text-3xl font-bold mb-3">
-                  Test Drive Request Sent
-                </h4>
-
-                <p className="text-muted-foreground mb-6">
-                  Your request for {getVehicleLabel(selectedVehicle)} on {date}{" "}
-                  at {time} has been captured.
+                <CheckCircle2 className="mx-auto mb-5 text-green-600" size={64} />
+                <h4 className="text-3xl font-bold mb-3">Test Drive Request Sent</h4>
+                <p className="text-muted-foreground mb-2">
+                  {confirmation?.message ||
+                    `Your request for ${selectedVehicle?.make} ${selectedVehicle?.name} on ${date} at ${time} has been captured.`}
                 </p>
-
+                <p className="text-muted-foreground mb-6">
+                  {selectedVehicle?.make} {selectedVehicle?.name} on {date} at {time}
+                  {confirmation?.reference ? ` · Reference ${confirmation.reference}` : ""}
+                </p>
+                <p className="text-sm text-muted-foreground mb-6">
+                  {getConfirmationEmailMessage(confirmation?.notification, phone)}
+                </p>
                 <Button
                   type="button"
                   onClick={resetSuccess}
@@ -104,18 +108,16 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label htmlFor="vehicle">Vehicle</Label>
-
                     <select
                       id="vehicle"
+                      required
                       value={selectedVehicleId}
-                      onChange={(event) =>
-                        setSelectedVehicleId(event.target.value)
-                      }
+                      onChange={(event) => setSelectedVehicleId(event.target.value)}
                       className="h-12 w-full rounded-lg border border-border bg-background px-4 text-sm"
                     >
                       {vehicles.map((vehicle) => (
                         <option key={vehicle.id} value={vehicle.id}>
-                          {getVehicleLabel(vehicle)} — {vehicle.year}
+                          {vehicle.make} {vehicle.name} — {vehicle.year}
                         </option>
                       ))}
                     </select>
@@ -123,10 +125,11 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
 
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
-
                     <Input
                       id="phone"
                       type="tel"
+                      autoComplete="tel"
+                      required
                       value={phone}
                       onChange={(event) => setPhone(event.target.value)}
                       placeholder="+256 700 000 000"
@@ -139,11 +142,11 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                       <Calendar size={16} />
                       Date
                     </Label>
-
                     <Input
                       id="date"
                       type="date"
                       min={today}
+                      required
                       value={date}
                       onChange={(event) => setDate(event.target.value)}
                       className="h-12"
@@ -156,12 +159,12 @@ export function TestDriveScheduler({ vehicles }: TestDriveSchedulerProps) {
                     state={availability}
                     vehicleSelected={Boolean(selectedVehicleId)}
                     dateSelected={Boolean(date)}
+                    onRetry={availability.retry}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes</Label>
-
                   <textarea
                     id="notes"
                     value={notes}

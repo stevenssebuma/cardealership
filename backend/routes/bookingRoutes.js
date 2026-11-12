@@ -1,19 +1,44 @@
-// backend/routes/bookingRoutes.js
 import express from 'express';
-import * as bookingController from '../controllers/bookingController.js';
-import { protect } from '../middleware/authMiddleware.js';
+
+import {
+  authenticateToken,
+  rateLimitProtectedRoute,
+} from '../middleware/authMiddleware.js';
+
+import {
+  createBooking,
+  getAvailability,
+  getMyBookings,
+  getUserBookings,
+  cancelBooking,
+} from '../controllers/bookingController.js';
 
 const router = express.Router();
 
-// Availability (public)
-router.get('/check-availability', bookingController.checkAvailability);
-router.get('/available-slots/:carId/:date', bookingController.getAvailableSlots);
-router.get('/weekly-availability/:carId', bookingController.getWeeklyAvailability);
+// Create a test-drive booking for the signed-in customer (slot conflict check
+// + confirmation email). The identity always comes from the bearer token.
+router.post('/create', rateLimitProtectedRoute, authenticateToken, createBooking);
 
-// Bookings
-router.post('/create', protect, bookingController.createBooking);
-router.get('/me', protect, bookingController.getUserBookings);
-router.get('/my-bookings', protect, bookingController.getUserBookings);
-router.delete('/:id/cancel', protect, bookingController.cancelBooking);
+// Slots that can still be booked for a car on a date
+router.get('/check-availability', getAvailability);
+
+// Bookings belonging to the authenticated customer
+router.get('/me', rateLimitProtectedRoute, authenticateToken, getMyBookings);
+
+// Bookings for a specific user (only the owner, or an admin, may read them)
+router.get(
+  '/user/:user_id',
+  rateLimitProtectedRoute,
+  authenticateToken,
+  getUserBookings,
+);
+
+// Cancel a booking (only the owner, or an admin, may cancel)
+router.put(
+  '/:id/cancel',
+  rateLimitProtectedRoute,
+  authenticateToken,
+  cancelBooking,
+);
 
 export default router;

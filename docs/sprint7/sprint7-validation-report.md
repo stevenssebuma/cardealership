@@ -1,5 +1,9 @@
 # Sprint 7 Frontend Validation Report
 
+> **Snapshot of this sprint.** The counts below are the record of Sprint 7, not the current suite.
+> Current backend runner: `cd backend && npm test` → 6 suites / 62 tests. Booking contract:
+> [../sprint6/sprint6-validation-report.md](../sprint6/sprint6-validation-report.md) § Task 3.
+
 ## Validation scope
 
 Full Sprint 7 admin-chat validation and existing frontend regression suites were executed before the cross-team live inquiry drill.

@@ -35,8 +35,11 @@ export function useProfileUpdate() {
         const response = await updateProfile(user, accessToken, values);
         setResult(response);
 
-        if (response.success) updateUser(response.user);
-        else if (response.code === "UNAUTHORIZED") logout();
+        if (response.success === false) {
+          if (response.code === "UNAUTHORIZED") logout();
+        } else {
+          updateUser(response.user);
+        }
 
         return response;
       } finally {

@@ -1,14 +1,21 @@
 export const ADMIN_CHAT_TYPING_THROTTLE_MILLISECONDS = 1000;
 export const ADMIN_CHAT_TYPING_INACTIVITY_MILLISECONDS = 3000;
 
+/**
+ * `setTimeout` hands back a `number` handle in browsers and a `Timeout` object in
+ * Node, and the manual suite injects its own scheduler, so the pending-handle
+ * type has to cover every timer implementation that can be plugged in.
+ */
+type TypingThrottleTimer = number | ReturnType<typeof setTimeout>;
+
 export type TypingThrottleControllerOptions = {
   onTypingStart: () => void;
   onTypingStop: () => void;
   throttleMilliseconds?: number;
   inactivityMilliseconds?: number;
   now?: () => number;
-  schedule?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
-  cancel?: (timer: ReturnType<typeof setTimeout>) => void;
+  schedule?: (callback: () => void, delay: number) => TypingThrottleTimer;
+  cancel?: (timer: TypingThrottleTimer) => void;
 };
 
 export type TypingThrottleController = {
@@ -31,11 +38,13 @@ export function createTypingThrottleController(
     options.inactivityMilliseconds ?? ADMIN_CHAT_TYPING_INACTIVITY_MILLISECONDS,
   );
   const now = options.now ?? Date.now;
-  const schedule = options.schedule ?? setTimeout;
-  const cancel = options.cancel ?? clearTimeout;
+  const schedule: (callback: () => void, delay: number) => TypingThrottleTimer =
+    options.schedule ?? setTimeout;
+  const cancel: (timer: TypingThrottleTimer) => void =
+    options.cancel ?? clearTimeout;
 
   let lastStartAt = Number.NEGATIVE_INFINITY;
-  let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+  let inactivityTimer: TypingThrottleTimer | null = null;
   let typing = false;
   let disposed = false;
 

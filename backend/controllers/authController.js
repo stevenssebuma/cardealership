@@ -1,153 +1,660 @@
-// backend/controllers/authController.js
-import bcrypt from 'bcryptjs';
-import db from '../config/db.js';
-import { signToken } from '../utils/jwt.js';
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import pool from "../config/db.js";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
 
-// ------- REGISTER -------
+function createToken(user) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT_SECRET is missing from backend/.env");
+  }
+
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    }
+  );
+}
+
+/**
+ * Development sign-in mode.
+ *
+ * When AUTH_ALLOW_ANY_CREDENTIALS=true and NODE_ENV is not "production", any
+ * email/password pair signs in: a missing account is created on first use and an
+ * existing account skips the password check. Emails whose local part starts
+ * with "admin" get the admin role, which is what makes the /Admin dashboard
+ * reachable for demos. Hard-disabled in production.
+ */
+function isOpenSignInEnabled() {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
+  return String(process.env.AUTH_ALLOW_ANY_CREDENTIALS || "").toLowerCase() === "true";
+}
+
+function normalizeEmailLocalPart(email) {
+  return String(email || "").split("@")[0] || "";
+}
+
+function roleForEmail(email) {
+  return normalizeEmailLocalPart(email).toLowerCase().startsWith("admin")
+    ? "admin"
+    : "user";
+}
+
+function localPartToDisplayName(email) {
+  const name = normalizeEmailLocalPart(email).replace(/[._-]+/g, " ").trim();
+
+  return name || "Customer";
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone,
+    created_at: user.created_at,
+    updated_at: user.updated_at,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
+| REGISTER
+|--------------------------------------------------------------------------
+*/
+
 export async function register(req, res) {
   try {
-    const { name, email, password } = req.body || {};
+    const {
+      name = "",
+      email,
+      password,
+      phone = null,
+    } = req.body || {};
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ success: false, message: 'name, email and password are required' });
+    const normalizedEmail = normalizeEmail(email);
+    const plainPassword = String(password || "");
+
+    if (!normalizedEmail || !plainPassword.trim()) {
+
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
     }
-    if (!EMAIL_RE.test(email)) {
-      return res.status(400).json({ success: false, message: 'Invalid email format' });
-    }
-    if (password.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
-    }
 
-    const normalizedEmail = email.toLowerCase().trim();
-
-    const existing = await db.query('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ success: false, message: 'Email already registered' });
+    if (plainPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const existingUser = await pool.query(
+      `
+        SELECT id
+        FROM users
+        WHERE LOWER(email) = $1
+        LIMIT 1
+      `,
+      [normalizedEmail]
+    );
 
-    const result = await db.query(
-      `INSERT INTO users (name, email, password, role)
-       VALUES (?, ?, ?, 'user')
-       RETURNING id, name, email, role, created_at`,
-      [name.trim(), normalizedEmail, passwordHash]
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email already exists",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(plainPassword, 12);
+
+    const result = await pool.query(
+      `
+        INSERT INTO users (
+          name,
+          email,
+          password,
+          role,
+          phone
+        )
+        VALUES ($1, $2, $3, 'user', $4)
+        RETURNING
+          id,
+          name,
+          email,
+          role,
+          phone,
+          created_at,
+          updated_at
+      `,
+      [
+        String(name || "").trim(),
+        normalizedEmail,
+        hashedPassword,
+        phone ? String(phone).trim() : null,
+      ]
     );
 
     const user = result.rows[0];
-    const token = signToken({ id: user.id, role: user.role });
+    const token = createToken(user);
 
-    res.status(201).json({ success: true, message: 'Registered successfully', user, token });
-  } catch (err) {
-    console.error('register error:', err.message);
-    res.status(500).json({ success: false, message: 'Registration failed' });
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful",
+      token,
+      user: publicUser(user),
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "An account with this email already exists",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Registration failed",
+      error: error.message,
+    });
   }
 }
 
-// ------- LOGIN -------
+/*
+|--------------------------------------------------------------------------
+| LOGIN
+|--------------------------------------------------------------------------
+*/
+
 export async function login(req, res) {
   try {
     const { email, password } = req.body || {};
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'email and password are required' });
+    const normalizedEmail = normalizeEmail(email);
+    const plainPassword = String(password || "");
+
+    if (!normalizedEmail || !plainPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
     }
 
-    const result = await db.query(
-      'SELECT id, name, email, password, role FROM users WHERE email = ?',
-      [email.toLowerCase().trim()]
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          name,
+          email,
+          password,
+          role,
+          phone,
+          created_at,
+          updated_at
+        FROM users
+        WHERE LOWER(email) = $1
+        LIMIT 1
+      `,
+      [normalizedEmail]
     );
 
-    const user = result.rows[0];
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
+    const openSignIn = isOpenSignInEnabled();
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
-    }
-
-    const safeUser = { id: user.id, name: user.name, email: user.email, role: user.role };
-    const token = signToken({ id: user.id, role: user.role });
-
-    res.json({ success: true, message: 'Login successful', user: safeUser, token });
-  } catch (err) {
-    console.error('login error:', err.message);
-    res.status(500).json({ success: false, message: 'Login failed' });
-  }
-}
-
-// ------- ME -------
-export async function me(req, res) {
-  res.json({ success: true, user: req.user });
-}
-
-// ------- LOGOUT -------
-export async function logout(req, res) {
-  res.json({ success: true, message: 'Logged out successfully' });
-}
-
-// ------- REFRESH TOKEN -------
-export async function refreshToken(req, res) {
-  const token = signToken({ id: req.user.id, role: req.user.role });
-  res.json({ success: true, token });
-}
-
-// ------- CHANGE PASSWORD -------
-export async function changePassword(req, res) {
-  try {
-    const { currentPassword, newPassword } = req.body || {};
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: 'currentPassword and newPassword are required' });
-    }
-    if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
-    }
-
-    const result = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
-    const user = result.rows[0];
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-
-    const ok = await bcrypt.compare(currentPassword, user.password);
-    if (!ok) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
-
-    const hash = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [hash, req.user.id]);
-
-    res.json({ success: true, message: 'Password changed successfully' });
-  } catch (err) {
-    console.error('changePassword error:', err.message);
-    res.status(500).json({ success: false, message: 'Change password failed' });
-  }
-}
-
-// ------- ADMIN: GET ALL USERS -------
-export async function getAllUsers(req, res) {
-  try {
-    const result = await db.query(
-      'SELECT id, name, email, role, created_at FROM users ORDER BY created_at DESC'
-    );
-    res.json({ success: true, count: result.rows.length, users: result.rows });
-  } catch (err) {
-    console.error('getAllUsers error:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to fetch users' });
-  }
-}
-
-// ------- ADMIN: DELETE USER -------
-export async function deleteUser(req, res) {
-  try {
-    const { id } = req.params;
-    const result = await db.query('DELETE FROM users WHERE id = ? RETURNING id', [id]);
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      if (!openSignIn) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
+
+      // Development sign-in: the first sign-in with an unknown address creates
+      // the account so demos never depend on pre-seeded users.
+      const hashedPassword = await bcrypt.hash(plainPassword, 12);
+
+      const created = await pool.query(
+        `
+          INSERT INTO users (
+            name,
+            email,
+            password,
+            role,
+            phone
+          )
+          VALUES ($1, $2, $3, $4, NULL)
+          RETURNING
+            id,
+            name,
+            email,
+            role,
+            phone,
+            created_at,
+            updated_at
+        `,
+        [
+          localPartToDisplayName(normalizedEmail),
+          normalizedEmail,
+          hashedPassword,
+          roleForEmail(normalizedEmail),
+        ]
+      );
+
+      const createdUser = publicUser(created.rows[0]);
+
+      console.log(
+        `Development sign-in created ${createdUser.role} account for ${createdUser.email}`
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Login successful",
+        token: createToken(createdUser),
+        user: createdUser,
+      });
     }
-    res.json({ success: true, message: 'User deleted' });
-  } catch (err) {
-    console.error('deleteUser error:', err.message);
-    res.status(500).json({ success: false, message: 'Failed to delete user' });
+
+    const databaseUser = result.rows[0];
+
+    if (!openSignIn) {
+      const passwordMatches = await bcrypt.compare(
+        plainPassword,
+        databaseUser.password
+      );
+
+      if (!passwordMatches) {
+        return res.status(401).json({
+          success: false,
+          message: "Invalid email or password",
+        });
+      }
+    }
+
+    const user = publicUser(databaseUser);
+    const token = createToken(user);
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      user,
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Login failed",
+      error: error.message,
+    });
   }
 }
+
+/*
+|--------------------------------------------------------------------------
+| GET CURRENT USER
+|--------------------------------------------------------------------------
+*/
+
+export async function getCurrentUser(req, res) {
+  try {
+    const userId = req.user?.id || req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication is required",
+      });
+    }
+
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          name,
+          email,
+          role,
+          phone,
+          created_at,
+          updated_at
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: publicUser(result.rows[0]),
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get user",
+      error: error.message,
+    });
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| UPDATE CURRENT USER
+|--------------------------------------------------------------------------
+*/
+
+export async function updateCurrentUser(req, res) {
+  try {
+    const userId = req.user?.id || req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication is required",
+      });
+    }
+
+    const { name, email, phone } = req.body || {};
+
+    if (
+      name === undefined &&
+      email === undefined &&
+      phone === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one field is required",
+      });
+    }
+
+    const fields = [];
+    const values = [];
+    let parameterNumber = 1;
+
+    if (name !== undefined) {
+      fields.push(`name = $${parameterNumber++}`);
+      values.push(String(name).trim());
+    }
+
+    if (email !== undefined) {
+      fields.push(`email = $${parameterNumber++}`);
+      values.push(normalizeEmail(email));
+    }
+
+    if (phone !== undefined) {
+      fields.push(`phone = $${parameterNumber++}`);
+      values.push(phone ? String(phone).trim() : null);
+    }
+
+    fields.push("updated_at = CURRENT_TIMESTAMP");
+
+    values.push(userId);
+
+    const result = await pool.query(
+      `
+        UPDATE users
+        SET ${fields.join(", ")}
+        WHERE id = $${parameterNumber}
+        RETURNING
+          id,
+          name,
+          email,
+          role,
+          phone,
+          created_at,
+          updated_at
+      `,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      user: publicUser(result.rows[0]),
+    });
+  } catch (error) {
+    console.error("Update user error:", error);
+
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "That email address is already in use",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user",
+      error: error.message,
+    });
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| CHANGE PASSWORD
+|--------------------------------------------------------------------------
+*/
+
+export async function changeCurrentUserPassword(req, res) {
+  try {
+    const userId = req.user?.id || req.params.id;
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication is required",
+      });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Current password and new password are required",
+      });
+    }
+
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 6 characters",
+      });
+    }
+
+    const result = await pool.query(
+      `
+        SELECT id, password
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      currentPassword,
+      result.rows[0].password
+    );
+
+    if (!passwordMatches) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await pool.query(
+      `
+        UPDATE users
+        SET password = $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `,
+      [hashedPassword, userId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error("Change password error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to change password",
+      error: error.message,
+    });
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| DELETE CURRENT USER
+|--------------------------------------------------------------------------
+*/
+
+export async function deleteCurrentUser(req, res) {
+  try {
+    const userId = req.user?.id || req.params.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "User authentication is required",
+      });
+    }
+
+    const result = await pool.query(
+      `
+        DELETE FROM users
+        WHERE id = $1
+        RETURNING id
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User account deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete user error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete user",
+      error: error.message,
+    });
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| GET SESSION
+|--------------------------------------------------------------------------
+*/
+
+export const getSession = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        message: "User authentication is required",
+      });
+    }
+
+    // The JWT only carries id/email/role. The session check confirms the
+    // account still exists and returns the complete profile so the frontend can
+    // restore name and phone after a page reload.
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          name,
+          email,
+          role,
+          phone,
+          created_at,
+          updated_at
+        FROM users
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        valid: false,
+        message: "Your session is no longer valid. Please sign in again.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      valid: true,
+      user: publicUser(result.rows[0]),
+    });
+  } catch (error) {
+    console.error("Get session error:", error);
+
+    return res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Session could not be verified",
+      error: error.message,
+    });
+  }
+};

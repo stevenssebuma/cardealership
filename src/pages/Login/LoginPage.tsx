@@ -23,7 +23,7 @@ export function LoginPage() {
                 Manage every journey from one secure workspace.
               </h1>
               <p className="max-w-lg text-lg leading-8 text-muted-foreground">
-                Access inventory workflows, test-drive dispatch, and operational insights through a focused administrator experience.
+                Book test drives, track your enquiries, and keep showroom inventory and dispatch in one place.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -35,7 +35,7 @@ export function LoginPage() {
               <div className="rounded-2xl border border-border/80 bg-card/65 p-5 backdrop-blur-xl">
                 <ShieldCheck className="mb-3 size-6 text-primary" aria-hidden="true" />
                 <p className="font-semibold">Protected access</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">Administrator routes remain guarded by the approved session flow.</p>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">Your account, bookings, and enquiries stay behind a verified session.</p>
               </div>
             </div>
           </div>
@@ -61,7 +61,7 @@ export function LoginPage() {
             </div>
 
             <p className="mt-6 text-center text-xs leading-5 text-muted-foreground">
-              Protected by secure session verification. Never share administrator credentials.
+              Protected by secure session verification. Keep your account password private.
             </p>
           </div>
         </section>

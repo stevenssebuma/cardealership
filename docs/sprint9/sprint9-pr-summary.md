@@ -1,5 +1,9 @@
 # Sprint 9 Pull-Request Summary
 
+> **Snapshot of this sprint.** Test counts in this summary are the record of Sprint 9, not the
+> current suite. Current backend runner: `cd backend && npm test` → 6 suites / 62 tests. Booking
+> contract: [../sprint6/sprint6-validation-report.md](../sprint6/sprint6-validation-report.md) § Task 3.
+
 ## Summary
 
 Sprint 9 adds two tested backend integrations:

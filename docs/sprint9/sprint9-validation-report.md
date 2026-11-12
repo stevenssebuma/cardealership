@@ -1,5 +1,9 @@
 # Sprint 9 Validation Report
 
+> **Snapshot of this sprint.** The counts below are the record of Sprint 9, not the current suite.
+> Current backend runner: `cd backend && npm test` → 6 suites / 62 tests. Booking contract:
+> [../sprint6/sprint6-validation-report.md](../sprint6/sprint6-validation-report.md) § Task 3.
+
 ## Verified baseline
 
 Phase 10 completed at commit `7855374`, directly after Phase 9 commit `2517904`, with a clean worktree.

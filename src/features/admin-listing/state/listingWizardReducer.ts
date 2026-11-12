@@ -24,8 +24,10 @@ export type ListingWizardAction =
   | { type: "navigation/go"; step: ListingWizardStep }
   | { type: "submission/start" }
   | { type: "submission/finish" }
-  | { type: "reset" }
-  | { type: string; [key: string]: unknown };
+  | { type: "reset" };
+// A catch-all `{ type: string; [key: string]: unknown }` used to sit here. It
+// made every discriminant resolve to `unknown`, so the reducer could not read
+// `action.field`, `action.step` or `action.errors` without casts.
 
 function uniqueSteps(
   steps: ListingWizardStep[],

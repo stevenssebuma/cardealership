@@ -17,8 +17,8 @@
 
 - Administrator booking listing: PARTIAL. A protected listing route exists, but its response and storage implementations conflict.
 - Booking status vocabulary: PARTIAL. `pending`, `confirmed`, and `cancelled` are present.
-- Completed status: BLOCKED. Backend support is unconfirmed.
-- Status mutation route: BLOCKED. A controller exists, but a mounted protected route was not confirmed.
+- Completed status: SUPPORTED. `completed` is an allowlisted persisted status (verified 2026-11-12).
+- Status mutation route: CONFIRMED IN CODE. `PUT /api/admin/bookings/:id/status`, admin-guarded; live transition validation still pending.
 - Transition rules: BLOCKED. No status allowlist or legal transition graph exists.
 - Idempotency and stale-update handling: BLOCKED.
 - Live synchronization: BLOCKED. No approved WebSocket, server-sent event, polling, or refresh contract exists.

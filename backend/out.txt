@@ -1,0 +1,46 @@
+?? Sample data loaded:
+   - Cars: 7
+   - Users: 4
+   - Bookings: 3
+   - Sales: 5
+   - Search Logs: 5
+◇ injected env (12) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+◇ injected env (0) from .env // tip: ⌘ enable debugging { debug: true }
+========================================
+Panda Motors API Server
+========================================
+Server running on: http://localhost:5500
+Environment: development
+Database initialization verified.
+Test drive reminder job started. Checking every 60 minute(s) for appointments approximately 24 hour(s) away.
+
+Available Endpoints:
+   --- Financial ---
+   POST /api/finance/calculate  - Loan calculator
+   --- Dealership ---
+   GET  /api/dealership/location - Store location
+   GET  /api/dealership/status   - Open status
+   --- Test Drive Booking ---
+   POST /api/bookings/create - Book test drive with conflict logic
+   GET  /api/bookings/check-availability - Check availability
+   GET  /api/bookings/user/:user_id - Get user bookings
+   PUT  /api/bookings/:id/cancel - Cancel booking
+   --- Admin Analytics ---
+   GET  /api/admin/stats - Full admin statistics
+   GET  /api/admin/stats/summary - Quick summary
+   --- Performance & Optimized Queries (NEW) ---
+   GET  /api/optimized/search - Optimized inventory search
+   GET  /api/optimized/availability - Quick availability check
+   GET  /api/optimized/stats - Inventory statistics
+   GET  /api/optimized/most-searched - Most searched makes
+   GET  /api/optimized/performance - Query performance report
+   --- Admin Metrics Dashboard (NEW) ---
+   GET  /api/admin/metrics - Full admin dashboard metrics
+   GET  /api/admin/metrics/inventory - Inventory metrics only
+   GET  /api/admin/metrics/bookings - Booking metrics only
+   --- Health ---
+   GET  /api/health - Health check
+========================================
+
+Test drive reminder check complete: 0 sent, 0 failed, 0 in window, 2 scanned.

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/button";
-import { Footer } from "../../app/components/Footer/Footer";
+import { Footer } from "../../components/common/Footer/Footer";
 import { Navbar } from "../../app/components/Navbar/Navbar";
 import { FinancingQuoteFlow } from "../../features/financing/components/FinancingQuoteFlow";
 import { getCarById } from "../../features/cars/services/carsService";

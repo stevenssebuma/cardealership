@@ -1,5 +1,6 @@
 import { authenticatedApiRequest } from "../../../api/client";
 import type {
+  BookingCancelResult,
   BookingHistoryItem,
   BookingHistoryResult,
 } from "../types";
@@ -29,6 +30,8 @@ type RawBooking = {
   status?: string;
 };
 
+// Synthetic rows have no server record behind them, so they are never
+// cancellable — offering the action would only produce a failing request.
 const SYNTHETIC_BOOKINGS: BookingHistoryItem[] = [
   {
     id: "mock-booking-001",
@@ -37,6 +40,7 @@ const SYNTHETIC_BOOKINGS: BookingHistoryItem[] = [
     date: "2026-09-14",
     time: "10:30",
     status: "upcoming",
+    canCancel: false,
   },
   {
     id: "mock-booking-002",
@@ -45,6 +49,7 @@ const SYNTHETIC_BOOKINGS: BookingHistoryItem[] = [
     date: "2026-06-11",
     time: "14:00",
     status: "completed",
+    canCancel: false,
   },
   {
     id: "mock-booking-003",
@@ -53,6 +58,7 @@ const SYNTHETIC_BOOKINGS: BookingHistoryItem[] = [
     date: "2026-07-03",
     time: "09:30",
     status: "cancelled",
+    canCancel: false,
   },
 ];
 
@@ -77,6 +83,9 @@ function normalizeBooking(item: RawBooking): BookingHistoryItem {
     date,
     time: String(item.time_slot ?? item.timeSlot ?? ""),
     status,
+    // Only an upcoming booking can still be called off; the backend rejects a
+    // second cancel with 400, and past appointments are already settled.
+    canCancel: status === "upcoming",
   };
 }
 
@@ -139,6 +148,104 @@ export async function loadBookingHistory(
       success: false,
       code: "BOOKING_HISTORY_FAILED",
       message: "Booking history could not be loaded. Please try again.",
+    };
+  }
+}
+
+export const BOOKING_CANCEL_ENDPOINT = (bookingId: string) =>
+  `/api/bookings/${encodeURIComponent(bookingId)}/cancel`;
+
+/**
+ * Cancels one of the signed-in customer's own bookings. Ownership is enforced
+ * server-side from the bearer token, so the id alone never grants access.
+ */
+export async function cancelBookingRequest(
+  bookingId: string,
+  accessToken: string,
+  options: BookingHistoryOptions = {},
+): Promise<BookingCancelResult> {
+  if (options.mockMode ?? isProfileMockMode()) {
+    return {
+      success: false,
+      code: "CANCEL_FAILED",
+      message:
+        "Cancelling is unavailable while synthetic booking data is displayed.",
+    };
+  }
+
+  try {
+    const requestOptions: RequestInit = {
+      method: "PUT",
+      headers: { Accept: "application/json" },
+    };
+
+    const response = options.fetcher
+      ? await options.fetcher(BOOKING_CANCEL_ENDPOINT(bookingId), {
+          ...requestOptions,
+          headers: {
+            ...requestOptions.headers,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        })
+      : await authenticatedApiRequest(
+          BOOKING_CANCEL_ENDPOINT(bookingId),
+          accessToken,
+          requestOptions,
+        );
+
+    if (response.status === 401) {
+      return {
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "Your session has expired. Please sign in again.",
+      };
+    }
+
+    if (response.status === 403) {
+      return {
+        success: false,
+        code: "FORBIDDEN",
+        message: "That booking belongs to another account.",
+      };
+    }
+
+    if (response.status === 400) {
+      return {
+        success: false,
+        code: "ALREADY_CANCELLED",
+        message: "That booking is already cancelled.",
+      };
+    }
+
+    if (response.status === 404) {
+      return {
+        success: false,
+        code: "CANCEL_FAILED",
+        message: "That booking no longer exists.",
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        code: "CANCEL_FAILED",
+        message: "The booking could not be cancelled. Please try again.",
+      };
+    }
+
+    const data = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+
+    return {
+      success: true,
+      message: data.message ?? "Booking cancelled.",
+    };
+  } catch {
+    return {
+      success: false,
+      code: "CANCEL_FAILED",
+      message: "The booking could not be cancelled. Please try again.",
     };
   }
 }

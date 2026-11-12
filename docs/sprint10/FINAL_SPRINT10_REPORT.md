@@ -13,7 +13,7 @@ Sprint 10 completed setup documentation, API documentation, manual API coverage,
 - Frontend and backend installation, configuration, database requirements, and startup are documented.
 
 ## API documentation result
-- Registration, login, cars, test-drive, and administrator-statistics endpoints are documented.
+- Registration, login, cars, test-drive (`POST /api/test-drives`, the legacy request-only endpoint), and administrator-statistics endpoints are documented. The persisted, token-scoped booking flow (`POST /api/bookings/create`) is documented in [../sprint6/sprint6-validation-report.md](../sprint6/sprint6-validation-report.md) § Task 3.
 
 ## Manual API test result
 - All five endpoints have reusable positive and negative manual requests using safe placeholders.

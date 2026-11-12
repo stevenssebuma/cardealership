@@ -67,7 +67,7 @@ export function MessageComposer() {
       inquiryId: activeInquiryId,
       message: validation.message,
     });
-    if (!result.ok) {
+    if (result.ok === false) {
       setValidationError(result.error);
       return;
     }

@@ -1,4 +1,4 @@
-import { Clock, LoaderCircle } from "lucide-react";
+import { Clock, LoaderCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type {
@@ -13,6 +13,8 @@ type AvailabilitySlotPickerProps = {
   state: AvailabilityState;
   vehicleSelected: boolean;
   dateSelected: boolean;
+  /** Re-runs the availability request after a failed load. */
+  onRetry?: () => void;
 };
 
 function getSuccessfulResult(
@@ -27,8 +29,21 @@ export function AvailabilitySlotPicker({
   state,
   vehicleSelected,
   dateSelected,
+  onRetry,
 }: AvailabilitySlotPickerProps) {
   const successfulResult = getSuccessfulResult(state.result);
+  const retryButton = onRetry ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="availability-retry"
+      onClick={onRetry}
+    >
+      <RefreshCw size={14} className="mr-1" />
+      Try again
+    </Button>
+  ) : null;
 
   return (
     <fieldset className="availability-picker">
@@ -48,9 +63,12 @@ export function AvailabilitySlotPicker({
         </p>
       ) : state.status === "error" ? (
         <p role="alert" className="availability-message availability-error">
-          {state.result && !state.result.success
-            ? state.result.message
-            : "Availability could not be loaded. Please try again."}
+          <span>
+            {state.result && !state.result.success
+              ? state.result.message
+              : "Availability could not be loaded. Please try again."}
+          </span>
+          {retryButton}
         </p>
       ) : successfulResult ? (
         <>
@@ -82,6 +100,16 @@ export function AvailabilitySlotPicker({
           {successfulResult.availableSlots.length === 0 && (
             <p className="availability-message availability-error">
               No test-drive times are available on this date.
+            </p>
+          )}
+
+          {retryButton && (
+            <p className="availability-message">
+              <span>
+                {successfulResult.availableSlots.length} of{" "}
+                {successfulResult.slots.length} slots are still open.
+              </span>
+              {retryButton}
             </p>
           )}
 

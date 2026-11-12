@@ -1,14 +1,21 @@
-require("dotenv").config();
+import pg from "pg";
+import dotenv from "dotenv";
 
-const pool = require("./config/db");
+dotenv.config();
 
-pool.query("SELECT NOW()", (err, res) => {
-  if (err) {
-    console.error("Database Error:", err);
-  } else {
-    console.log("Database Connected!");
-    console.log(res.rows);
-  }
+const { Pool } = pg;
 
-  process.exit();
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 });
+
+pool.on("error", (error) => {
+  console.error("Unexpected PostgreSQL pool error:", error);
+});
+
+export default pool;

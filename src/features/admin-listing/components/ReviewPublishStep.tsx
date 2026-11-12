@@ -14,7 +14,8 @@ type ReviewPublishStepProps = {
 const text = (value: string) => value.trim();
 
 export function ReviewPublishStep({ draft, images, result, isSubmitting, onPublish }: ReviewPublishStepProps) {
-  const retryable = !result?.success && Boolean(result?.retryable);
+  // Explicit discriminant so the failure branch narrows (`strict` is off).
+  const retryable = result?.success === false && result.retryable;
   return (
     <section className="space-y-6" aria-labelledby="listing-review-title">
       <div><h3 id="listing-review-title" className="text-xl font-semibold">Review and publish</h3><p className="mt-1 text-sm text-muted-foreground">Confirm the sanitized vehicle summary before publication.</p></div>

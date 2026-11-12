@@ -71,7 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setState(session ? createAuthenticatedState(session) : createUnauthenticatedState());
       })
       .catch(() => {
-        clearStoredSession();
+        // The stored session is kept: a dropped connection during restoration
+        // must not destroy a valid login. The next reload retries it.
         setState(createUnauthenticatedState({ code: "SESSION_VERIFICATION_FAILED", message: "Session restoration could not be completed." }));
       })
       .finally(() => {

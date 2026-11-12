@@ -1,24 +1,40 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { register } from "../services";
+import { useAuth } from "../hooks";
 
 export function RegisterForm() {
+  const navigate = useNavigate();
+  const { login: applySession } = useAuth();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     setMessage("");
+    setFailed(false);
 
     const result = await register({ firstName, lastName, email, password });
+
+    if (result.success && result.session) {
+      // Registration returns a JWT, so the new customer is signed in straight
+      // away and can open the protected profile page.
+      applySession(result.session);
+      navigate("/profile");
+      return;
+    }
+
     setMessage(result.message);
+    setFailed(true);
     setSubmitting(false);
   };
 
@@ -32,7 +48,16 @@ export function RegisterForm() {
       </div>
 
       {message && (
-        <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm">{message}</div>
+        <div
+          role={failed ? "alert" : "status"}
+          className={
+            failed
+              ? "rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+              : "rounded-lg border border-border bg-muted/40 p-4 text-sm"
+          }
+        >
+          {message}
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-4">

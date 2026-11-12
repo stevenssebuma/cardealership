@@ -1,19 +1,177 @@
-.booking-loading, .booking-list {
+.booking-loading,
+.booking-list {
   display: grid;
   gap: 1rem;
 }
-.booking-loading { padding-top: 1.5rem; }
-.booking-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+
+.booking-loading {
   padding-top: 1.5rem;
 }
-.booking-item p {
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
+
+.booking-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
+
+/* One row per booking: vehicle and slot on the left, status and actions right. */
+.booking-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+
+.booking-item-copy {
+  min-width: 0;
+}
+
+.booking-item-copy strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.booking-item-copy p {
+  margin: 0.25rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+
+.booking-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.booking-upcoming {
+  background: rgba(212, 175, 55, 0.16);
+  color: #f0d98a;
+}
+
+.booking-completed {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+.booking-cancelled {
+  background: rgba(220, 38, 38, 0.16);
+  color: #fca5a5;
+}
+
+.booking-actions {
+  display: inline-flex;
+  gap: 0.5rem;
+  justify-self: end;
+}
+
+.booking-cancel {
+  border: 1px solid rgba(252, 165, 165, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: #fca5a5;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.booking-cancel:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.14);
+}
+
+.booking-cancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* The confirming half of the two-step cancel: destructive, so it is the one
+   filled control in the row. */
+.booking-cancel--confirm {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #0b0b0b;
+}
+
+.booking-cancel--confirm:hover:not(:disabled) {
+  background: var(--primary);
+  filter: brightness(1.06);
+}
+
+.booking-cancel:focus-visible,
+.booking-tab:focus-visible,
+.booking-retry:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.booking-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.booking-tab {
+  border: 0;
+  background: none;
+  color: var(--muted-foreground);
+  padding: 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.booking-tab:hover {
+  color: var(--foreground);
+}
+
+.booking-tab[aria-selected="true"] {
+  color: var(--primary);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+.booking-panel {
+  padding-top: 0.25rem;
+}
+
+.booking-feedback {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.booking-notice {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  border-radius: 7px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+  font-size: 0.8125rem;
+}
+
+.booking-cancel-error {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid rgba(252, 165, 165, 0.35);
+  border-radius: 7px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #fca5a5;
+  font-size: 0.8125rem;
+}
+
 .booking-state {
   display: flex;
   min-height: 8rem;
@@ -23,8 +181,46 @@
   text-align: center;
   color: var(--muted-foreground);
 }
-.booking-error { color: rgb(185 28 28); }
-.booking-mock { color: rgb(146 64 14); font-size: 0.875rem; }
-.booking-upcoming { background: rgb(219 234 254); color: rgb(30 64 175); }
-.booking-completed { background: rgb(220 252 231); color: rgb(22 101 52); }
-.booking-cancelled { background: rgb(254 226 226); color: rgb(153 27 27); }
+
+.booking-error {
+  color: #fca5a5;
+}
+
+.booking-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.booking-retry:hover {
+  background: var(--muted);
+}
+
+.booking-mock {
+  color: #f0d98a;
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 560px) {
+  .booking-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .booking-actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .booking-cancel {
+    flex: 1 1 auto;
+    min-height: 40px;
+  }
+}

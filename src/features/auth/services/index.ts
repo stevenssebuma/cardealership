@@ -12,5 +12,6 @@ export {
   verifySession,
 } from "./authService";
 
-export { AUTH_SESSION_VERIFICATION_ENDPOINT, createAuthorizationHeaders } from "./authApi";
+export { AUTH_LOGIN_ENDPOINT, AUTH_REGISTER_ENDPOINT, AUTH_SESSION_VERIFICATION_ENDPOINT, AuthApiError, createAuthorizationHeaders } from "./authApi";
 export type { AuthStorage } from "./authStorage";
+export type { LoginOptions } from "./authService";

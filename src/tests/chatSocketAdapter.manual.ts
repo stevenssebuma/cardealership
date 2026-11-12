@@ -1,4 +1,4 @@
-import { strict as assert } from "node:assert";
+import assert from "node:assert/strict";
 import { createChatSocket, MockChatSocket, normalizeIncomingMessage } from "../features/admin-chat/services";
 
 const SENSITIVE_TOKEN = "synthetic-token-that-must-not-leak";

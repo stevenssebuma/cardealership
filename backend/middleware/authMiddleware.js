@@ -1,74 +1,217 @@
 // backend/middleware/authMiddleware.js
-import db from '../config/db.js';
-import { verifyToken } from '../utils/jwt.js';
 
-// In-memory login rate limiter
-const loginAttempts = new Map();
-const MAX_ATTEMPTS = 5;
-const WINDOW_MS = 15 * 60 * 1000;
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import { SessionManager } from "../services/sessionManager.js";
 
-export function rateLimitLogin(req, res, next) {
-  const key = req.ip || 'unknown';
-  const now = Date.now();
-  const record = loginAttempts.get(key) || { count: 0, start: now };
+dotenv.config();
 
-  if (now - record.start > WINDOW_MS) {
-    record.count = 0;
-    record.start = now;
-  }
+const JWT_SECRET = process.env.JWT_SECRET || "panda_motors_secret_key_2026";
 
-  record.count += 1;
-  loginAttempts.set(key, record);
+function createSlidingWindowRateLimiter({ limit, windowMs, code, message }) {
+  const attempts = new Map();
 
-  if (record.count > MAX_ATTEMPTS) {
-    return res.status(429).json({ success: false, message: 'Too many login attempts. Try again later.' });
-  }
+  return (req, res, next) => {
+    const key = String(req.user?.id || req.ip || req.connection.remoteAddress || "anonymous");
+    const now = Date.now();
+    const history = attempts.get(key) || [];
+    const recentAttempts = history.filter((time) => now - time < windowMs);
 
-  next();
+    if (recentAttempts.length >= limit) {
+      return res.status(429).json({
+        success: false,
+        error: {
+          code,
+          message,
+          status: 429,
+          details: null,
+        },
+      });
+    }
+
+    recentAttempts.push(now);
+    attempts.set(key, recentAttempts);
+
+    return next();
+  };
 }
 
-export async function authenticateToken(req, res, next) {
+export const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: "AUTHENTICATION_REQUIRED",
+        message: "Access denied. No token provided.",
+        status: 401,
+        details: null,
+      },
+    });
+  }
+
   try {
-    const header = req.headers.authorization || '';
-    if (!header.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'No token provided' });
+    // Try SessionManager verification first (new method)
+    const verifiedSession = await SessionManager.verifyToken(token);
+
+    if (verifiedSession.valid) {
+      req.user = verifiedSession.user;
+      req.session = {
+        id: verifiedSession.sessionId,
+        deviceId: verifiedSession.deviceId,
+        deviceName: verifiedSession.deviceName,
+      };
+      return next();
     }
 
-    const token = header.slice(7);
-    let decoded;
+    // If SessionManager verification fails, try JWT (fallback for legacy tokens)
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    return next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "TOKEN_EXPIRED",
+          message: "Token has expired. Please login again.",
+          status: 401,
+          details: null,
+        },
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: "INVALID_TOKEN",
+        message: "Invalid token. Access denied.",
+        status: 401,
+        details: null,
+      },
+    });
+  }
+};
+
+export const checkRole = (allowedRoles) => (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: "AUTHENTICATION_REQUIRED",
+        message: "Authentication required.",
+        status: 401,
+        details: null,
+      },
+    });
+  }
+
+  const userRole = req.user.role || "user";
+
+  if (!allowedRoles.includes(userRole)) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: "ADMIN_ACCESS_REQUIRED",
+        message: "Access denied. Insufficient permissions.",
+        status: 403,
+        details: {
+          requiredRoles: allowedRoles,
+          yourRole: userRole,
+        },
+      },
+    });
+  }
+
+  return next();
+};
+
+export const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (token) {
     try {
-      decoded = verifyToken(token);
+      // Try SessionManager verification first
+      const verifiedSession = await SessionManager.verifyToken(token);
+
+      if (verifiedSession.valid) {
+        req.user = verifiedSession.user;
+        req.session = {
+          id: verifiedSession.sessionId,
+          deviceId: verifiedSession.deviceId,
+          deviceName: verifiedSession.deviceName,
+        };
+        return next();
+      }
+
+      // Fallback to JWT
+      req.user = jwt.verify(token, JWT_SECRET);
     } catch {
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      req.user = null;
     }
-
-    const result = await db.query(
-      'SELECT id, name, email, role FROM users WHERE id = $1',
-      [decoded.id]
-    );
-    const user = result.rows[0];
-    if (!user) {
-      return res.status(401).json({ success: false, message: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (err) {
-    console.error('auth error:', err.message);
-    res.status(500).json({ success: false, message: 'Server error' });
+  } else {
+    req.user = null;
   }
-}
 
-export function isAdmin(req, res, next) {
-  if (!req.user || req.user.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Admin access required' });
+  return next();
+};
+
+export const generateToken = (user) => {
+  const payload = {
+    id: user.id || user._id,
+    email: user.email,
+    role: user.role || "user",
+    name: user.name || user.user_name,
+  };
+
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+};
+
+export const verifyToken = (token) => {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    return null;
   }
-  next();
-}
+};
 
-export const requireAdmin = isAdmin;
+export const decodeToken = (token) => {
+  try {
+    return jwt.decode(token);
+  } catch {
+    return null;
+  }
+};
 
-// Compatibility aliases used by the modular route packages.
-// Both aliases preserve the canonical authentication and administrator checks.
+export const rateLimitLogin = createSlidingWindowRateLimiter({
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+  code: "TOO_MANY_LOGIN_ATTEMPTS",
+  message: "Too many login attempts. Please try again in 15 minutes.",
+});
+
+export const rateLimitProtectedRoute = createSlidingWindowRateLimiter({
+  limit: 120,
+  windowMs: 15 * 60 * 1000,
+  code: "TOO_MANY_REQUESTS",
+  message: "Too many authenticated requests. Please wait and try again.",
+});
+
 export const protect = authenticateToken;
-export const adminOnly = isAdmin;
+export const adminOnly = checkRole(["admin"]);
+
+export default {
+  authenticateToken,
+  protect,
+  checkRole,
+  adminOnly,
+  rateLimitProtectedRoute,
+  optionalAuth,
+  generateToken,
+  verifyToken,
+  decodeToken,
+  rateLimitLogin,
+};

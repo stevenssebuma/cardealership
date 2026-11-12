@@ -1,23 +1,22 @@
 import express from "express";
 
-import { bulkCarImageController } from "../controllers/bulkCarImageController.js";
-import { bulkImageUpload } from "../middleware/bulkImageUpload.js";
-import {
-  validateCarPayload,
-  validateCarUpdatePayload,
-} from "../middleware/validateCarPayload.js";
+import { validateCarPayload } from "../middleware/validateCarPayload.js";
 
 import {
   fetchCars,
   fetchCarById,
   addCar,
-  editCar,
-  removeCar,
 } from "../controllers/carsController.js";
 
 import { uploadCarImage } from "../controllers/carImageController.js";
+
 import { uploadSingleCarImage } from "../middleware/uploadMiddleware.js";
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
+
+import {
+  protect,
+  adminOnly,
+  rateLimitProtectedRoute,
+} from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -36,10 +35,16 @@ router.get("/", fetchCars);
 |
 | POST /api/cars/upload
 |
+| multipart/form-data:
+| image      = image file
+| carId      = existing car ID
+| imageType  = primary or general
+|
 */
 
 router.post(
   "/upload",
+  rateLimitProtectedRoute,
   protect,
   adminOnly,
   uploadSingleCarImage,
@@ -52,46 +57,15 @@ router.post(
 |--------------------------------------------------------------------------
 */
 
-router.post("/", protect, adminOnly, validateCarPayload, addCar);
-
-/*
-|--------------------------------------------------------------------------
-| BULK CAR IMAGE UPLOAD
-|--------------------------------------------------------------------------
-*/
-
-router.post(
-  "/:id/images/bulk",
-  protect,
-  adminOnly,
-  bulkImageUpload,
-  bulkCarImageController.uploadBulkImages,
-);
-
-/*
-|--------------------------------------------------------------------------
-| UPDATE CAR
-|--------------------------------------------------------------------------
-|
-| Partial updates are supported.
-| Only supplied inventory fields are validated and updated.
-|
-*/
-
-router.patch("/:id", protect, adminOnly, validateCarUpdatePayload, editCar);
-
-/*
-|--------------------------------------------------------------------------
-| DELETE CAR
-|--------------------------------------------------------------------------
-*/
-
-router.delete("/:id", protect, adminOnly, removeCar);
+router.post("/", rateLimitProtectedRoute, protect, adminOnly, validateCarPayload, addCar);
 
 /*
 |--------------------------------------------------------------------------
 | GET SINGLE CAR
 |--------------------------------------------------------------------------
+|
+| Keep this dynamic route after specific routes such as /upload.
+|
 */
 
 router.get("/:id", fetchCarById);
