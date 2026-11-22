@@ -1,14 +1,7 @@
-require("dotenv").config();
-
-const pool = require("./config/db");
-
-pool.query("SELECT NOW()", (err, res) => {
-  if (err) {
-    console.error("Database Error:", err);
-  } else {
-    console.log("Database Connected!");
-    console.log(res.rows);
-  }
-
-  process.exit();
-});
+import db from './config/db.js';
+import { runOperation } from './scripts/databaseOperations.js';
+await runOperation(async () => {
+  const result = await db.verifyDatabaseConnection();
+  if (!result.connected) process.exitCode = 1;
+  return result;
+}, db.close);

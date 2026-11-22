@@ -40,16 +40,13 @@ export async function fetchCars(req, res) {
       cars,
     });
   } catch (error) {
-    console.error("Fetch cars failed:", error);
+    console.error("Fetch cars failed:", error.code || "DB_FAILURE");
 
     return sendError(
       res,
       500,
       "FETCH_CARS_FAILED",
       "Unable to load vehicle inventory.",
-      {
-        reason: error.message,
-      },
     );
   }
 }
@@ -88,16 +85,13 @@ export async function fetchCarById(req, res) {
       },
     });
   } catch (error) {
-    console.error("Fetch car by ID failed:", error);
+    console.error("Fetch car by ID failed:", error.code || "DB_FAILURE");
 
     return sendError(
       res,
       500,
       "FETCH_CAR_FAILED",
       "Unable to load the selected vehicle.",
-      {
-        reason: error.message,
-      },
     );
   }
 }
@@ -116,16 +110,14 @@ export async function addCar(req, res) {
       },
     });
   } catch (error) {
-    console.error("Create car failed:", error);
+    if (error.code === "23505") return sendError(res, 409, "CAR_CONFLICT", "Vehicle already exists.");
+    console.error("Create car failed:", error.code || "DB_FAILURE");
 
     return sendError(
       res,
       500,
       "CREATE_CAR_FAILED",
       "Unable to create the vehicle.",
-      {
-        reason: error.message,
-      },
     );
   }
 }
@@ -174,16 +166,14 @@ export async function editCar(req, res) {
       },
     });
   } catch (error) {
-    console.error("Update car failed:", error);
+    if (error.code === "23505") return sendError(res, 409, "CAR_CONFLICT", "Vehicle already exists.");
+    console.error("Update car failed:", error.code || "DB_FAILURE");
 
     return sendError(
       res,
       500,
       "UPDATE_CAR_FAILED",
       "Unable to update the vehicle.",
-      {
-        reason: error.message,
-      },
     );
   }
 }
@@ -220,16 +210,14 @@ export async function removeCar(req, res) {
       car: deletedCar,
     });
   } catch (error) {
-    console.error("Delete car failed:", error);
+    if (["23001", "23503"].includes(error.code)) return sendError(res, 409, "CAR_HAS_DEPENDENCIES", "Vehicle has dependent records.");
+    console.error("Delete car failed:", error.code || "DB_FAILURE");
 
     return sendError(
       res,
       500,
       "DELETE_CAR_FAILED",
       "Unable to delete the vehicle.",
-      {
-        reason: error.message,
-      },
     );
   }
 }

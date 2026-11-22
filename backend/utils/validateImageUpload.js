@@ -1,4 +1,10 @@
 import path from "node:path";
+
+// Local-storage compatibility: strip path components from either platform.
+export function sanitizeImageFilename(value) {
+  const basename = path.posix.basename(String(value ?? "").replaceAll("\\", "/"));
+  return basename.replace(/[^A-Za-z0-9._-]/g, "_").replace(/^\.+/, "") || "image";
+}
 import {
   BULK_IMAGE_UPLOAD_ERROR_CODES,
 } from "../contracts/bulkImageUpload.contract.js";

@@ -3,7 +3,7 @@ import {
   saveCarImage,
 } from "../models/carsModel.js";
 
-export const carLookupRepository = Object.freeze({
+export const createCarLookupRepository = (database) => Object.freeze({
   async findById(carId) {
     const normalizedCarId = Number(carId);
 
@@ -14,18 +14,21 @@ export const carLookupRepository = Object.freeze({
       return null;
     }
 
-    const result = await getCarById(normalizedCarId);
+    const result = await getCarById(normalizedCarId, database);
     return result?.car || null;
   },
 });
 
-export const carImageRepository = Object.freeze({
+export const createCarImageRepository = (database) => Object.freeze({
   async create({
     carId,
     url,
     displayOrder = 0,
   }) {
     const normalizedCarId = Number(carId);
+    if (!Number.isSafeInteger(normalizedCarId) || normalizedCarId <= 0 || typeof url !== 'string' || !url.trim()) {
+      throw new TypeError('A valid car ID and image URL are required.');
+    }
     const imageType =
       Number(displayOrder) === 0
         ? "primary"
@@ -35,6 +38,7 @@ export const carImageRepository = Object.freeze({
       normalizedCarId,
       url,
       imageType,
+      database,
     );
 
     return Object.freeze({
@@ -45,3 +49,6 @@ export const carImageRepository = Object.freeze({
     });
   },
 });
+
+export const carLookupRepository = createCarLookupRepository();
+export const carImageRepository = createCarImageRepository();

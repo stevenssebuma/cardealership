@@ -55,7 +55,7 @@ From the repository root:
 
 ```bash
 cd backend
-npm install
+npm ci
 ```
 
 Start the backend:
@@ -64,7 +64,8 @@ Start the backend:
 npm run dev
 ```
 
-The backend defaults to `http://localhost:5500` when `PORT` is not overridden.
+The backend defaults to port 5000 when `PORT` is not overridden. The examples
+below explicitly configure port 5500 to match the frontend.
 
 ## Frontend environment setup
 
@@ -94,9 +95,11 @@ At minimum, configure:
 
 ```dotenv
 PORT=5500
-DATABASE_URL=postgresql://database-user:database-password@localhost:5432/car_dealership
+NODE_ENV=development
+DATABASE_URL=postgresql://database-user:database-password@localhost:5432/cardealership_dev
 JWT_SECRET=replace-with-a-long-random-secret
 SITE_URL=http://localhost:5173
+CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
 Keep the real `.env` file untracked.
@@ -105,6 +108,18 @@ Keep the real `.env` file untracked.
 
 The backend requires PostgreSQL for persistent users, inventory, and database-backed features. Create the configured database and grant the configured account the required privileges before starting live API validation.
 
+For a newly created, empty development database, run from `backend/`:
+
+```bash
+npm run db:init -- --confirm cardealership_dev
+npm run db:check
+```
+
+Do not use this command on an existing production database. Tests require
+`TEST_DATABASE_URL` pointing to a separate test database. See
+[PostgreSQL operations](backend/docs/POSTGRESQL-OPERATIONS.md) for the
+guarded initialization, seed, admin rotation, diagnostics and staging procedures.
+
 Database-dependent endpoints must not be reported as working when PostgreSQL is unavailable. Record database connection failures as environment blockers.
 
 ## Development startup order
@@ -112,7 +127,7 @@ Database-dependent endpoints must not be reported as working when PostgreSQL is 
 1. Install root frontend dependencies.
 2. Install dependencies inside `backend/`.
 3. Create local frontend and backend environment files.
-4. Start PostgreSQL.
+4. Start PostgreSQL and initialize the dedicated development database explicitly.
 5. Start the backend from `backend/`.
 6. Start the frontend from the repository root.
 7. Run manual API requests and deterministic tests.

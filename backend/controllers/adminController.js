@@ -1,5 +1,10 @@
 // backend/controllers/adminController.js
 import db from '../config/db.js';
+import { mapCarRow } from '../utils/databaseRows.js';
+
+const numericFields = (row, fields) => Object.fromEntries(
+  Object.entries(row).map(([key, value]) => [key, fields.includes(key) ? Number(value ?? 0) : value])
+);
 
 // ============================================
 // GET ADMIN STATS
@@ -9,10 +14,10 @@ export const getAdminStats = async (req, res) => {
     const carsResult = await db.query(`
       SELECT
         COUNT(*) as total,
-        SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as available,
-        SUM(CASE WHEN status='sold' THEN 1 ELSE 0 END) as sold,
-        SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN status='rejected' THEN 1 ELSE 0 END) as rejected,
+        SUM(CASE WHEN lower(status)='available' THEN 1 ELSE 0 END) as available,
+        SUM(CASE WHEN lower(status)='sold' THEN 1 ELSE 0 END) as sold,
+        SUM(CASE WHEN lower(status)='pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN lower(status)='rejected' THEN 1 ELSE 0 END) as rejected,
         AVG(price) as avg_price
       FROM cars
     `);
@@ -22,7 +27,7 @@ export const getAdminStats = async (req, res) => {
         COUNT(*) as total,
         SUM(CASE WHEN role='admin' THEN 1 ELSE 0 END) as admins,
         SUM(CASE WHEN role='user' THEN 1 ELSE 0 END) as regular,
-        SUM(CASE WHEN created_at >= date('now','-7 days') THEN 1 ELSE 0 END) as new_this_week
+        SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END) as new_this_week
       FROM users
     `);
 
@@ -33,8 +38,8 @@ export const getAdminStats = async (req, res) => {
         SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) as confirmed,
         SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed,
         SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END) as cancelled,
-        SUM(CASE WHEN booking_date >= date('now','start of month') THEN 1 ELSE 0 END) as this_month,
-        SUM(CASE WHEN booking_date >= date('now','-7 days') THEN 1 ELSE 0 END) as this_week
+        SUM(CASE WHEN booking_date >= date_trunc('month', CURRENT_DATE)::date THEN 1 ELSE 0 END) as this_month,
+        SUM(CASE WHEN booking_date >= CURRENT_DATE - 7 THEN 1 ELSE 0 END) as this_week
       FROM bookings
     `);
 
@@ -43,32 +48,32 @@ export const getAdminStats = async (req, res) => {
     );
 
     const pendingCarsResult = await db.query(
-      `SELECT COUNT(*) as pending_cars FROM cars WHERE status='pending'`
+      `SELECT COUNT(*) as pending_cars FROM cars WHERE lower(status)='pending'`
     );
 
     const popularCarsResult = await db.query(`
-      SELECT c.id, c.name, c.brand, c.price,
+      SELECT c.id, c.name, COALESCE(c.brand, c.make) AS brand, c.price,
              COUNT(b.id) as booking_count,
              SUM(CASE WHEN b.status='completed' THEN 1 ELSE 0 END) as completed_count
       FROM cars c
       LEFT JOIN bookings b ON c.id = b.car_id
-      GROUP BY c.id, c.name, c.brand, c.price
+      GROUP BY c.id
       ORDER BY booking_count DESC
       LIMIT 5
     `);
 
     const monthlyTrendResult = await db.query(`
-      SELECT strftime('%Y-%m', booking_date) as month, COUNT(*) as bookings
+      SELECT to_char(booking_date, 'YYYY-MM') as month, COUNT(*) as bookings
       FROM bookings
-      WHERE booking_date >= date('now', '-6 months')
-      GROUP BY strftime('%Y-%m', booking_date)
+      WHERE booking_date >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY to_char(booking_date, 'YYYY-MM')
       ORDER BY month
     `);
 
     const dailyBookingsResult = await db.query(`
-      SELECT booking_date as date, COUNT(*) as bookings
+      SELECT booking_date::text as date, COUNT(*) as bookings
       FROM bookings
-      WHERE booking_date >= date('now', '-30 days')
+      WHERE booking_date >= CURRENT_DATE - 30
       GROUP BY booking_date
       ORDER BY booking_date
     `);
@@ -142,16 +147,16 @@ export const getAdminStats = async (req, res) => {
             ? +(totalBookings / totalUsers).toFixed(2)
             : 0
         },
-        popularCars: popularCarsResult.rows,
-        topUsers: topUsersResult.rows,
-        monthlyTrend: monthlyTrendResult.rows,
-        dailyBookings: dailyBookingsResult.rows,
+        popularCars: popularCarsResult.rows.map(row => numericFields(mapCarRow(row), ['booking_count', 'completed_count'])),
+        topUsers: topUsersResult.rows.map(row => numericFields(row, ['booking_count'])),
+        monthlyTrend: monthlyTrendResult.rows.map(row => numericFields(row, ['bookings'])),
+        dailyBookings: dailyBookingsResult.rows.map(row => numericFields(row, ['bookings'])),
         generatedAt: new Date().toISOString()
       }
     });
   } catch (error) {
-    console.error('Error getting admin stats:', error.message);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    console.error('Error getting admin stats:', error.code || 'ADMIN_FAILURE');
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
@@ -161,8 +166,8 @@ export const getAdminStats = async (req, res) => {
 export const exportStatsCSV = async (req, res) => {
   try {
     const bookings = await db.query(`
-      SELECT b.id, u.name as user, u.email, c.name as car, c.brand,
-             b.booking_date, b.time_slot, b.status, b.created_at
+      SELECT b.id, u.name as user, u.email, c.name as car, COALESCE(c.brand,c.make) AS brand,
+             b.booking_date::text AS booking_date, b.time_slot, b.status, b.created_at
       FROM bookings b
       JOIN users u ON b.user_id = u.id
       JOIN cars c ON b.car_id = c.id
@@ -194,21 +199,22 @@ export const getAllBookings = async (req, res) => {
     const where = [];
     const params = [];
 
-    if (status) { where.push('b.status = ?'); params.push(status); }
-    if (from) { where.push('b.booking_date >= ?'); params.push(from); }
-    if (to) { where.push('b.booking_date <= ?'); params.push(to); }
-    if (car_id) { where.push('b.car_id = ?'); params.push(car_id); }
-    if (user_id) { where.push('b.user_id = ?'); params.push(user_id); }
+    const bind = (value) => { params.push(value); return `$${params.length}`; };
+    if (status) where.push(`b.status = ${bind(status)}`);
+    if (from) where.push(`b.booking_date >= ${bind(from)}`);
+    if (to) where.push(`b.booking_date <= ${bind(to)}`);
+    if (car_id) where.push(`b.car_id = ${bind(car_id)}`);
+    if (user_id) where.push(`b.user_id = ${bind(user_id)}`);
     if (q) {
-      where.push('(u.name LIKE ? OR u.email LIKE ? OR c.name LIKE ?)');
-      params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+      const search = bind(`%${q}%`);
+      where.push(`(u.name ILIKE ${search} OR u.email ILIKE ${search} OR c.name ILIKE ${search})`);
     }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const result = await db.query(`
-      SELECT b.*, u.name as user_name, u.email as user_email,
-             c.name as car_name, c.brand as car_brand
+      SELECT b.*, b.booking_date::text AS booking_date, u.name as user_name, u.email as user_email,
+             c.name as car_name, COALESCE(c.brand,c.make) as car_brand
       FROM bookings b
       JOIN users u ON b.user_id = u.id
       JOIN cars c ON b.car_id = c.id
@@ -230,8 +236,8 @@ export const getAllBookings = async (req, res) => {
 export const getPendingApprovals = async (req, res) => {
   try {
     const bookingsResult = await db.query(`
-      SELECT b.*, u.name as user_name, u.email as user_email,
-             c.name as car_name, c.brand as car_brand
+      SELECT b.*, b.booking_date::text AS booking_date, u.name as user_name, u.email as user_email,
+             c.name as car_name, COALESCE(c.brand,c.make) as car_brand
       FROM bookings b
       JOIN users u ON b.user_id = u.id
       JOIN cars c ON b.car_id = c.id
@@ -240,13 +246,13 @@ export const getPendingApprovals = async (req, res) => {
     `);
 
     const carsResult = await db.query(`
-      SELECT * FROM cars WHERE status = 'pending' ORDER BY created_at ASC
+      SELECT * FROM cars WHERE lower(status) = 'pending' ORDER BY created_at ASC
     `);
 
     res.json({
       success: true,
       pendingBookings: bookingsResult.rows,
-      pendingCars: carsResult.rows,
+      pendingCars: carsResult.rows.map(mapCarRow),
       totalPending: bookingsResult.rows.length + carsResult.rows.length
     });
   } catch (error) {
@@ -267,8 +273,8 @@ export const updateBookingStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
     const result = await db.query(
-      `UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? RETURNING *`,
+      `UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 RETURNING *, booking_date::text AS booking_date`,
       [status, id]
     );
     if (result.rows.length === 0) {
@@ -276,6 +282,7 @@ export const updateBookingStatus = async (req, res) => {
     }
     res.json({ success: true, booking: result.rows[0] });
   } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ success: false, message: 'This time slot is already booked' });
     console.error('updateBookingStatus error:', error.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -294,14 +301,14 @@ export const bulkUpdateBookings = async (req, res) => {
     if (!allowed.includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status' });
     }
-    const placeholders = ids.map(() => '?').join(',');
     const result = await db.query(
-      `UPDATE bookings SET status = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id IN (${placeholders}) RETURNING id`,
-      [status, ...ids]
+      `UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ANY($2::int[]) RETURNING id`,
+      [status, ids]
     );
     res.json({ success: true, updatedIds: result.rows.map(r => r.id) });
   } catch (error) {
+    if (error.code === '23505') return res.status(409).json({ success: false, message: 'One or more time slots are already booked' });
     console.error('bulkUpdateBookings error:', error.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -314,13 +321,13 @@ export const approveCar = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query(
-      `UPDATE cars SET status = 'available' WHERE id = ? RETURNING *`,
+      `UPDATE cars SET status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
       [id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Car not found' });
     }
-    res.json({ success: true, car: result.rows[0] });
+    res.json({ success: true, car: mapCarRow(result.rows[0]) });
   } catch (error) {
     console.error('approveCar error:', error.message);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -334,13 +341,13 @@ export const rejectCar = async (req, res) => {
   try {
     const { id } = req.params;
     const result = await db.query(
-      `UPDATE cars SET status = 'rejected' WHERE id = ? RETURNING *`,
+      `UPDATE cars SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
       [id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Car not found' });
     }
-    res.json({ success: true, car: result.rows[0] });
+    res.json({ success: true, car: mapCarRow(result.rows[0]) });
   } catch (error) {
     console.error('rejectCar error:', error.message);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -355,29 +362,18 @@ export const updateCar = async (req, res) => {
     const { id } = req.params;
     const { name, brand, price, year, status, description, image_url } = req.body;
 
-    const current = await db.query('SELECT * FROM cars WHERE id = ?', [id]);
-    if (current.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Car not found' });
-    }
-    const c = current.rows[0];
-
     const result = await db.query(
       `UPDATE cars
-       SET name = ?, brand = ?, price = ?, year = ?, status = ?, description = ?, image_url = ?
-       WHERE id = ?
+       SET name = COALESCE($1,name), brand = COALESCE($2,brand,make), make = COALESCE($2,make,brand),
+           price = COALESCE($3,price), year = COALESCE($4,year), status = COALESCE($5,status),
+           description = COALESCE($6,description), image_url = COALESCE($7,image_url),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $8
        RETURNING *`,
-      [
-        name ?? c.name,
-        brand ?? c.brand,
-        price ?? c.price,
-        year ?? c.year,
-        status ?? c.status,
-        description ?? c.description,
-        image_url ?? c.image_url,
-        id
-      ]
+      [name, brand, price, year, status, description, image_url, id]
     );
-    res.json({ success: true, car: result.rows[0] });
+    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Car not found' });
+    res.json({ success: true, car: mapCarRow(result.rows[0]) });
   } catch (error) {
     console.error('updateCar error:', error.message);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -390,12 +386,13 @@ export const updateCar = async (req, res) => {
 export const deleteCar = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await db.query('DELETE FROM cars WHERE id = ? RETURNING *', [id]);
+    const result = await db.query('DELETE FROM cars WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Car not found' });
     }
-    res.json({ success: true, car: result.rows[0] });
+    res.json({ success: true, car: mapCarRow(result.rows[0]) });
   } catch (error) {
+    if (['23001', '23503'].includes(error.code)) return res.status(409).json({ success: false, message: 'Car has dependent records' });
     console.error('deleteCar error:', error.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
