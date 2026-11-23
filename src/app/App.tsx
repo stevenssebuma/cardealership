@@ -1,35 +1,32 @@
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/auth";
+import { AdminLayout } from "./layouts/AdminLayout";
+import { SiteLayout } from "./layouts/SiteLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import { PublicOnlyRoute } from "./components/auth/PublicOnlyRoute";
 import { HashScrollHandler } from "./providers/HashScrollHandler";
+import { AboutPage } from "../pages/About/AboutPage";
+import { ContactPage } from "../pages/Contact/ContactPage";
+import { NotFoundPage } from "../pages/NotFound/NotFoundPage";
 import { LoginPage } from "../pages/Login/LoginPage";
 import { RegisterPage } from "../pages/Register/RegisterPage";
 import ProfilePage from "../pages/Profile/ProfilePage";
 import AdminPage from "../pages/Admin/AdminPage";
 import { AdminChatPage } from "../pages/AdminChat/AdminChatPage";
-import { AdminChatProvider } from "../features/admin-chat/context/AdminChatContext";
 import TestTasksPage from "../pages/TestTasks/TestTasksPage";
 import { HomePage } from "../pages/Home/HomePage";
 import { SettingsPage } from "../pages/Settings/SettingsPage";
 import { CarsPage } from "../pages/Cars/CarsPage";
-import { useAuth } from "../features/auth/hooks";
+import { VehicleDetailsPage } from "../pages/Cars/VehicleDetailsPage";
 
-function AdminChatLayout() {
-  const { user } = useAuth();
-
-  if (user?.role !== "admin") {
-    return <Navigate to="/" replace />;
-  }
-
-  return (
-    <AdminChatProvider>
-      <Outlet />
-    </AdminChatProvider>
-  );
-}
-
-
+/**
+ * The application's only route table.
+ *
+ * Every public page is a child of SiteLayout so the header and footer have one
+ * implementation, and `*` renders the 404 instead of falling back to the home
+ * page. Admin paths are lowercase; `/admin` sits outside SiteLayout because the
+ * console draws its own chrome through AdminShell.
+ */
 export default function App() {
   return (
     <AuthProvider>
@@ -38,34 +35,42 @@ export default function App() {
             sign-in screen or a link from another page. */}
         <HashScrollHandler />
         <Routes>
-          <Route path="/test" element={<TestTasksPage />} />
-          {/* LoginPage is a full-bleed, two-column screen. It must not be
-              wrapped in AuthLayout, whose max-w-md card and site header squeeze
-              the page and push the form outside the card. */}
+          <Route element={<SiteLayout />}>
+            <Route index element={<HomePage />} />
+            <Route path="cars" element={<CarsPage />} />
+            <Route path="cars/:id" element={<VehicleDetailsPage />} />
+            <Route path="about" element={<AboutPage />} />
+            <Route path="contact" element={<ContactPage />} />
+            {/* Unknown URLs land here with the site chrome intact. */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+
+          {/* LoginPage is a full-bleed, two-column screen, so it sits outside
+              SiteLayout and draws its own header. */}
           <Route
-            path="/login"
+            path="login"
             element={
               <PublicOnlyRoute>
                 <LoginPage />
               </PublicOnlyRoute>
             }
           />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route
-            path="/Admin"
-            element={
-              <ProtectedRoute>
-                <AdminChatLayout />
-              </ProtectedRoute>
-            }
-          >
+          <Route path="register" element={<RegisterPage />} />
+          {/* Component scratch page; reachable in dev builds only. */}
+          {import.meta.env.DEV && (
+            <Route path="test" element={<TestTasksPage />} />
+          )}
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+
+          <Route path="admin" element={<AdminLayout />}>
             <Route index element={<AdminPage />} />
             <Route path="chat" element={<AdminChatPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
-          <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-          <Route path="/cars" element={<CarsPage />} />
-          <Route path="/*" element={<HomePage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

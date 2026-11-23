@@ -122,6 +122,16 @@ const navLinkSource = readFileSync(
   "utf8",
 );
 const appSource = readFileSync("src/app/App.tsx", "utf8");
+// The router hangs /admin off a layout, so the provider and the role check are
+// asserted where they now live instead of in App.tsx.
+const adminLayoutSource = readFileSync(
+  "src/app/layouts/AdminLayout.tsx",
+  "utf8",
+);
+const protectedRouteSource = readFileSync(
+  "src/app/components/auth/ProtectedRoute.tsx",
+  "utf8",
+);
 
 assert.equal(badgeSource.includes("99+"), false);
 assert.equal(badgeSource.includes("UNREAD_CHAT_BADGE_MAXIMUM"), true);
@@ -130,17 +140,18 @@ assert.equal(navLinkSource.includes(
   "const { totalUnreadCount } = useAdminChat();",
 ), true);
 assert.equal(navLinkSource.includes(
-  `to="/Admin/chat"`,
+  `to="/admin/chat"`,
 ), true);
-assert.equal(appSource.match(/<AdminChatProvider>/g)?.length, 1);
-assert.equal(appSource.includes(`path="/Admin"`), true);
-assert.equal(appSource.includes(`<ProtectedRoute>`), true);
+assert.equal(adminLayoutSource.match(/<AdminChatProvider>/g)?.length, 1);
+assert.equal(adminLayoutSource.includes(`<Outlet />`), true);
+assert.equal(appSource.includes(`path="admin"`), true);
 assert.equal(appSource.includes(`<Route path="chat" element={<AdminChatPage />} />`), true);
-assert.equal(appSource.includes(`user?.role !== "admin"`), true);
+assert.equal(appSource.includes(`AdminChatProvider`), false);
+assert.equal(protectedRouteSource.includes(`user?.role !== "admin"`), true);
 
 console.log(JSON.stringify({
   suite: "unreadChatBadge",
-  passed: 18,
+  passed: 19,
   failed: 0,
   initialUnreadCountVerified: true,
   inactiveRoomIncrementVerified: true,

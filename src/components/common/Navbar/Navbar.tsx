@@ -1,7 +1,6 @@
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { scrollToSection } from "@/hooks/useScrollToSection";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { useAuth } from "@/features/auth/hooks";
 
 interface NavbarProps {
@@ -9,14 +8,19 @@ interface NavbarProps {
   onToggleMobileMenu: () => void;
 }
 
+/**
+ * Site navigation. Each item now points at the route that actually serves it:
+ * inventory and the About/Contact pages are real URLs, while services and the
+ * test-drive form remain sections of the home page.
+ */
 const navItems = [
-  { label: "INVENTORY", section: "inventory" },
-  { label: "SERVICES", section: "services" },
-  { label: "ABOUT", section: "about" },
-  { label: "CONTACT", section: "contact" },
+  { label: "INVENTORY", to: "/cars" },
+  { label: "SERVICES", to: "/#services" },
+  { label: "ABOUT", to: "/about" },
+  { label: "CONTACT", to: "/contact" },
 ] as const;
 
-const TEST_DRIVE_SECTION = "test-drive";
+const TEST_DRIVE_PATH = "/#test-drive";
 
 /**
  * Auth-aware account links, so a signed-in customer can always reach the
@@ -48,7 +52,7 @@ function AccountLinks({
   return (
     <>
       <Link
-        to={isAdmin ? "/Admin" : "/profile"}
+        to={isAdmin ? "/admin" : "/profile"}
         className={linkClassName}
         onClick={onNavigate}
       >
@@ -70,45 +74,29 @@ function AccountLinks({
 }
 
 export function Navbar({ mobileMenuOpen, onToggleMobileMenu }: NavbarProps) {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const isHome = location.pathname === "/";
-
   const closeMobileMenuIfOpen = () => {
     if (mobileMenuOpen) {
       onToggleMobileMenu();
     }
   };
 
-  const handleNavClick = (section: string) => {
-    closeMobileMenuIfOpen();
-    if (isHome) {
-      scrollToSection(section);
-      return;
-    }
-    // Any other route renders the home page, so a hash navigation brings the
-    // customer back to the requested section without a full page reload.
-    navigate(`/#${section}`);
-  };
-
   return (
     <>
       <nav className="hidden lg:flex items-center space-x-6">
         {navItems.map((item) => (
-          <button
-            key={item.section}
-            type="button"
-            onClick={() => handleNavClick(item.section)}
+          <Link
+            key={item.to}
+            to={item.to}
             className="text-sm font-medium hover:text-primary transition-colors"
           >
             {item.label}
-          </button>
+          </Link>
         ))}
         <Button
+          asChild
           className="bg-primary text-white hover:bg-primary/90"
-          onClick={() => handleNavClick(TEST_DRIVE_SECTION)}
         >
-          BOOK TEST DRIVE
+          <Link to={TEST_DRIVE_PATH}>BOOK TEST DRIVE</Link>
         </Button>
         <AccountLinks />
       </nav>
@@ -120,20 +108,19 @@ export function Navbar({ mobileMenuOpen, onToggleMobileMenu }: NavbarProps) {
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-20 left-0 right-0 bg-background border-b border-border px-6 py-4 space-y-4">
           {navItems.map((item) => (
-            <button
-              key={item.section}
-              type="button"
-              onClick={() => handleNavClick(item.section)}
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={closeMobileMenuIfOpen}
               className="block w-full text-left text-sm font-medium hover:text-primary transition-colors"
             >
               {item.label}
-            </button>
+            </Link>
           ))}
-          <Button
-            className="w-full bg-primary text-white hover:bg-primary/90"
-            onClick={() => handleNavClick(TEST_DRIVE_SECTION)}
-          >
-            BOOK TEST DRIVE
+          <Button asChild className="w-full bg-primary text-white hover:bg-primary/90">
+            <Link to={TEST_DRIVE_PATH} onClick={closeMobileMenuIfOpen}>
+              BOOK TEST DRIVE
+            </Link>
           </Button>
           <AccountLinks mobile onNavigate={closeMobileMenuIfOpen} />
         </div>
@@ -141,4 +128,3 @@ export function Navbar({ mobileMenuOpen, onToggleMobileMenu }: NavbarProps) {
     </>
   );
 }
-

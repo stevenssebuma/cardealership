@@ -16,7 +16,7 @@ export function AdminChatPage() {
   return (
     <AdminShell>
       <nav className="admin-chat-page-navigation" aria-label="Admin chat navigation">
-        <button type="button" onClick={() => navigate("/Admin")}>
+        <button type="button" onClick={() => navigate("/admin")}>
           <ArrowLeft size={18} aria-hidden="true" />
           <span>Admin dashboard</span>
         </button>

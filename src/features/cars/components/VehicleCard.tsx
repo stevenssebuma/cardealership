@@ -1,4 +1,5 @@
 import { ChevronRight } from "lucide-react";
+import { Link } from "react-router";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent } from "../../../components/ui/card";
 import { formatUGX } from "../utils/formatUGX";
@@ -98,14 +99,15 @@ export function VehicleCard({ vehicle }: VehicleCardProps) {
 
         </div>
 
-        {/* View details button */}
+        {/* Schedule test drive button */}
         <Button
-          type="button"
-          onClick={() => document.getElementById("test-drive")?.scrollIntoView({ behavior: "smooth" })}
+          asChild
           className="w-full mt-5 sm:mt-6 bg-primary hover:bg-primary/90 text-white font-semibold text-sm sm:text-base h-11 sm:h-12"
         >
-          SCHEDULE A TEST DRIVE
-          <ChevronRight className="ml-2" size={18} />
+          <Link to={`/?vehicle=${vehicle.id}#test-drive`}>
+            SCHEDULE A TEST DRIVE
+            <ChevronRight className="ml-2" size={18} />
+          </Link>
         </Button>
 
       </CardContent>

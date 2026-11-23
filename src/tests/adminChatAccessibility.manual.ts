@@ -16,6 +16,10 @@ assert.match(inbox, /admin-chat-mobile-thread-visible/);
 assert.match(list, /aria-busy="true"/);
 assert.match(list, /role="alert"/);
 assert.match(list, /No conversations/);
+assert.match(list, /placeholder="Search conversations"/);
+assert.match(list, /onChange=\{\(event\) => setSearchQuery\(event\.target\.value\)\}/);
+assert.match(list, /filteredConversations\.map/);
+assert.equal(list.includes("disabled"), false);
 assert.match(thread, /role="log"/);
 assert.match(thread, /aria-relevant="additions"/);
 assert.match(thread, /aria-busy/);
@@ -38,7 +42,7 @@ assert.match(badgeCss, /font-variant-numeric/);
 
 console.log(JSON.stringify({
   suite: "adminChatAccessibility",
-  passed: 24,
+  passed: 28,
   failed: 0,
   responsiveRulesVerified: true,
   failureStatesVerified: true,
@@ -47,5 +51,6 @@ console.log(JSON.stringify({
   mobileNavigationVerified: true,
   longContentVerified: true,
   highUnreadCountVerified: true,
+  conversationSearchEnabled: true,
   syntheticValidationOnly: true
 }, null, 2));

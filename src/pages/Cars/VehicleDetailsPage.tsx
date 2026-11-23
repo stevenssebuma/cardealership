@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/button";
-import { Footer } from "../../components/common/Footer/Footer";
-import { Navbar } from "../../app/components/Navbar/Navbar";
 import { FinancingQuoteFlow } from "../../features/financing/components/FinancingQuoteFlow";
 import { getCarById } from "../../features/cars/services/carsService";
 import type { Vehicle } from "../../features/cars/types";
@@ -80,7 +78,7 @@ export function VehicleDetailsPage() {
       <main className="mx-auto max-w-3xl px-6 py-40 text-center">
         <h1 className="text-3xl font-bold">We could not load this vehicle</h1>
         <p className="mt-3 text-muted-foreground">{error}</p>
-        <Button className="mt-6" onClick={() => navigate("/")}>
+        <Button className="mt-6" onClick={() => navigate("/cars")}>
           Return to inventory
         </Button>
       </main>
@@ -95,7 +93,7 @@ export function VehicleDetailsPage() {
         <p className="mt-3 text-muted-foreground">
           This vehicle may no longer be available, or the link may be incorrect.
         </p>
-        <Button className="mt-6" onClick={() => navigate("/")}>
+        <Button className="mt-6" onClick={() => navigate("/cars")}>
           Return to inventory
         </Button>
       </main>
@@ -103,7 +101,7 @@ export function VehicleDetailsPage() {
   else
     content = (
       <main className="mx-auto max-w-6xl space-y-10 px-6 pb-20 pt-32 lg:px-8">
-        <Button variant="outline" onClick={() => navigate("/")}>
+        <Button variant="outline" onClick={() => navigate("/cars")}>
           Back to inventory
         </Button>
         <section className="grid gap-8 rounded-2xl border border-border bg-card p-5 shadow-sm md:grid-cols-2 md:p-8">
@@ -133,11 +131,6 @@ export function VehicleDetailsPage() {
       </main>
     );
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      {content}
-      <Footer />
-    </div>
-  );
+  // Chrome comes from SiteLayout, so the page returns its own content only.
+  return <>{content}</>;
 }

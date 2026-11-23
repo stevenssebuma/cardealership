@@ -40,7 +40,7 @@ export function LoginForm() {
       // Apply the verified session to the AuthProvider so protected routes
       // (profile, settings, admin) unlock immediately after signing in.
       applySession(result.session);
-      const fallback = result.session.user.role === "admin" ? "/Admin" : "/";
+      const fallback = result.session.user.role === "admin" ? "/admin" : "/";
       navigate(getSafeRedirectPath(requestedRedirect, fallback));
       return;
     }

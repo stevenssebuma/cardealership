@@ -1,3 +1,5 @@
+import { Link } from "react-router";
+
 export function Footer() {
   return (
     <footer className="bg-background border-t border-border py-12 px-6 lg:px-8">
@@ -16,24 +18,24 @@ export function Footer() {
             <h5 className="font-bold mb-4">QUICK LINKS</h5>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="/#inventory" className="hover:text-primary transition-colors">
+                <Link to="/cars" className="hover:text-primary transition-colors">
                   Stock
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/#services" className="hover:text-primary transition-colors">
+                <Link to="/#services" className="hover:text-primary transition-colors">
                   Services
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/#about" className="hover:text-primary transition-colors">
+                <Link to="/about" className="hover:text-primary transition-colors">
                   About Us
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/#contact" className="hover:text-primary transition-colors">
+                <Link to="/contact" className="hover:text-primary transition-colors">
                   Contact
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

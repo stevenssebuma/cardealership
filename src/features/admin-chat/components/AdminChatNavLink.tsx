@@ -7,7 +7,7 @@ export function AdminChatNavLink() {
 
   return (
     <NavLink
-      to="/Admin/chat"
+      to="/admin/chat"
       className={({ isActive }) =>
         `admin-chat-nav-link${isActive ? " admin-chat-nav-link-active" : ""}`
       }

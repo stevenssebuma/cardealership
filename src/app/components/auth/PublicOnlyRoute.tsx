@@ -11,7 +11,7 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }) {
 
   if (decision === "loading") return <LoadingSpinner />;
   if (decision === "redirect-authenticated") {
-    const fallback = user?.role === "admin" ? "/Admin" : "/";
+    const fallback = user?.role === "admin" ? "/admin" : "/";
     return <Navigate to={getSafeRedirectPath(searchParams.get("redirect"), fallback)} replace />;
   }
   return <>{children}</>;

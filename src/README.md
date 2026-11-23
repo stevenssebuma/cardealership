@@ -30,6 +30,9 @@ Rules:
 | Code | Location |
 | --- | --- |
 | Route table | `src/app/App.tsx` (the only router) |
+| Public page chrome | `src/app/layouts/SiteLayout.tsx` (header + outlet + footer) |
+| Admin console chrome | `src/app/layouts/AdminLayout.tsx` (admin guard + chat provider) |
+| Not-found page | `src/pages/NotFound/NotFoundPage.tsx`, rendered by `path="*"` |
 | Page-specific components | `src/pages/<Feature>/components/` |
 | Reusable domain code (hooks, services, components, types) | `src/features/<feature>/` |
 | Design-system primitives (button, input, card, dialog…) | `src/components/ui/` |

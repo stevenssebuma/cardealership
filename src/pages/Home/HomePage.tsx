@@ -1,6 +1,3 @@
-import { Footer } from "../../components/common/Footer/Footer";
-import { Navbar } from "../../app/components/Navbar/Navbar";
-
 import { HeroSection } from "./components/HeroSection";
 import { ServicesSection } from "./components/ServicesSection";
 import { AboutSection } from "./components/AboutSection";
@@ -20,10 +17,6 @@ export function HomePage() {
   return (
 
     <>
-
-
-    <Navbar />
-
 
     <main>
 
@@ -103,11 +96,6 @@ export function HomePage() {
 
 
     </main>
-
-
-
-    <Footer />
-
 
     </>
 

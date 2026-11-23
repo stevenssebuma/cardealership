@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "@/features/auth/hooks";
 import { TestDriveBookingError, submitTestDriveBooking } from "../services";
 import type {
@@ -16,9 +16,13 @@ const LOGIN_REDIRECT = `/login?redirect=${encodeURIComponent("/#test-drive")}`;
 
 export function useTestDrive(vehicles: TestDriveVehicleOption[]) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const today = useMemo(() => getTodayDateInputValue(), []);
-  const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id?.toString() ?? "");
+  const requestedVehicleId = new URLSearchParams(location.search).get("vehicle") ?? "";
+  const [selectedVehicleId, setSelectedVehicleId] = useState(
+    requestedVehicleId || vehicles[0]?.id?.toString() || "",
+  );
   const [date, setDate] = useState(today);
   const [time, setTime] = useState("");
   const [phone, setPhone] = useState("");
@@ -30,6 +34,12 @@ export function useTestDrive(vehicles: TestDriveVehicleOption[]) {
   const [submitting, setSubmitting] = useState(false);
   const availability = useBookingAvailability(selectedVehicleId, date);
   const selectedVehicle = vehicles.find((vehicle) => vehicle.id.toString() === selectedVehicleId);
+
+  useEffect(() => {
+    if (requestedVehicleId) {
+      setSelectedVehicleId(requestedVehicleId);
+    }
+  }, [requestedVehicleId]);
 
   useEffect(() => {
     // The inventory loads asynchronously, so the first render has no vehicles to

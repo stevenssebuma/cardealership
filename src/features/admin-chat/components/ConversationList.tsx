@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Search } from "lucide-react";
 import { useAdminChat, useConversationSelection } from "../hooks";
+import { filterConversations } from "../utils/filterConversations";
 import { AdminChatEmptyState } from "./AdminChatEmptyState";
 import { ConversationListItem } from "./ConversationListItem";
 
@@ -14,6 +16,8 @@ export function ConversationList({
     useAdminChat();
   const { activeInquiryId, selectConversation } =
     useConversationSelection();
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredConversations = filterConversations(conversations, searchQuery);
 
   function handleSelect(inquiryId: string) {
     selectConversation(inquiryId);
@@ -47,12 +51,22 @@ export function ConversationList({
           <p className="admin-chat-eyebrow">Customer support</p>
           <h2 id="admin-chat-list-title">Conversations</h2>
         </div>
-        <span className="admin-chat-list-count">{conversations.length}</span>
+        <span className="admin-chat-list-count">
+          {searchQuery.trim()
+            ? `${filteredConversations.length}/${conversations.length}`
+            : conversations.length}
+        </span>
       </header>
 
       <div className="admin-chat-search-shell">
         <Search size={18} aria-hidden="true" />
-        <input type="search" placeholder="Search conversations" aria-label="Search conversations" disabled />
+        <input
+          type="search"
+          placeholder="Search conversations"
+          aria-label="Search conversations"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
       </div>
 
       {error && !error.inquiryId ? (
@@ -64,6 +78,11 @@ export function ConversationList({
 
       {conversations.length === 0 ? (
         <AdminChatEmptyState title="No conversations" description="New customer inquiries will appear here." />
+      ) : filteredConversations.length === 0 ? (
+        <AdminChatEmptyState
+          title="No matching conversations"
+          description="Try searching by customer name, email, vehicle, or message."
+        />
       ) : (
         <ul
           id="admin-chat-conversation-list"
@@ -71,7 +90,7 @@ export function ConversationList({
           aria-label="Customer conversations"
           tabIndex={-1}
         >
-          {conversations.map((conversation) => (
+          {filteredConversations.map((conversation) => (
             <ConversationListItem
               key={conversation.inquiry.id}
               conversation={conversation}

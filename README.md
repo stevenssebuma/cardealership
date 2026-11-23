@@ -123,7 +123,12 @@ Authentication ready and unauthenticated -> redirect to login
 Authenticated user visiting login -> redirect to the intended destination or dashboard
 ```
 
-The active router remains `src/app/App.tsx`. The unused `src/app/routes.tsx` configuration must not become a second active router during authentication implementation.
+The active router is `src/app/App.tsx` and it is the only route table. `src/app/routes.tsx` was
+removed and must not be reintroduced as a second router. Every public page is a child of
+`src/app/layouts/SiteLayout.tsx` (header, outlet, footer), admin screens hang off
+`src/app/layouts/AdminLayout.tsx` (admin guard plus the chat provider), each page has an explicit
+path, and `path="*"` renders `src/pages/NotFound/NotFoundPage.tsx` instead of falling back to the
+home page. Canonical admin paths are lowercase: `/admin` and `/admin/chat`.
 
 ### Security rules
 

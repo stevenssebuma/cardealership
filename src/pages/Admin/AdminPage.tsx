@@ -301,7 +301,7 @@ const AdminPage = () => {
         </div>
 
         <div className="admin-actions">
-          <Link to="/Admin/chat" className="secondary-button admin-action">
+          <Link to="/admin/chat" className="secondary-button admin-action">
             <MessageSquare size={16} aria-hidden="true" />
             Customer inbox
             <UnreadChatBadge count={totalUnreadCount} />

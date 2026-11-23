@@ -449,7 +449,7 @@
 
 /* ================================
    ADMIN CONSOLE
-   /Admin and /Admin/chat reuse the profile page surface (`.profile-page`,
+   /admin and /admin/chat reuse the profile page surface (`.profile-page`,
    `.profile-page--with-header`) and theme tokens so the staff screens read as
    one console rather than a separate light-themed app.
 ================================ */
