@@ -132,7 +132,7 @@ export class PDFGenerator {
         const maxPrice = totalCars > 0 ? Math.max(...inventoryData.map(c => c.price)) : 0;
         
         // Make breakdown
-        const makeCount = {};
+        const makeCount = Object.create(null);
         inventoryData.forEach(car => {
             makeCount[car.make] = (makeCount[car.make] || 0) + 1;
         });

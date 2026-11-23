@@ -4,7 +4,7 @@ import { VALID_TIME_SLOTS, BUSINESS_HOURS } from '../utils/validators.js';
 export async function getAvailableSlots(carId, date) {
   const result = await db.query(
     `SELECT time_slot FROM bookings
-     WHERE car_id = ? AND booking_date = ?
+     WHERE car_id = $1 AND booking_date = $2
        AND status NOT IN ('cancelled','completed')`,
     [carId, date]
   );
@@ -14,10 +14,9 @@ export async function getAvailableSlots(carId, date) {
 }
 
 export async function checkSlotAvailability(client, carId, date, timeSlot) {
-  // client is unused with sqlite; use db directly
-  const result = await db.query(
+  const result = await (client || db).query(
     `SELECT id, user_id, status FROM bookings
-     WHERE car_id = ? AND booking_date = ? AND time_slot = ?
+     WHERE car_id = $1 AND booking_date = $2 AND time_slot = $3
        AND status NOT IN ('cancelled','completed')`,
     [carId, date, timeSlot]
   );
@@ -41,11 +40,11 @@ export async function getWeeklyAvailability(carId, startDate) {
   return days;
 }
 
-export async function checkUserBookingLimits(userId) {
-  const result = await db.query(
+export async function checkUserBookingLimits(userId, client = db) {
+  const result = await client.query(
     `SELECT COUNT(*) as count FROM bookings
-     WHERE user_id = ? AND status IN ('pending','confirmed')
-       AND booking_date >= date('now')`,
+     WHERE user_id = $1 AND status IN ('pending','confirmed')
+       AND booking_date >= CURRENT_DATE`,
     [userId]
   );
   const active = +result.rows[0].count;

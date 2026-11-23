@@ -30,7 +30,8 @@ export function createExchangeRateRefreshWorker(options = {}) {
     timerHandle = null;
     return true;
   }
-  return Object.freeze({ tick, start, stop, isRunning: () => timerHandle !== null, isRefreshInFlight: () => pending !== null });
+  const drain = () => pending ? pending.catch(() => {}) : Promise.resolve();
+  return Object.freeze({ tick, start, stop, drain, isRunning: () => timerHandle !== null, isRefreshInFlight: () => pending !== null });
 }
 
 export const exchangeRateRefreshWorker = createExchangeRateRefreshWorker();

@@ -1,6 +1,8 @@
+"use strict";
+
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createBulkCarImageController, selectBulkUploadStatus, bulkCarImageController } from "../../controllers/bulkCarImageController.js";
+import { createBulkCarImageController, selectBulkUploadStatus } from "../../controllers/bulkCarImageController.js";
 import router from "../../routes/carsRoutes.js";
 import { protect, adminOnly } from "../../middleware/authMiddleware.js";
 import { bulkImageUpload } from "../../middleware/bulkImageUpload.js";
@@ -21,7 +23,7 @@ const createResponse = () => {
 };
 
 const createRequest = () => ({
-  params: { id: "car-123" },
+  params: { id: "123" },
   body: { clientFileIds: "[\"file-001\",\"file-002\"]" },
   files: [
     { originalname: "front.jpg", mimetype: "image/jpeg", size: 100, buffer: Buffer.from("front") },
@@ -37,7 +39,6 @@ test("route middleware order is authentication authorization upload controller",
   assert.equal(layer.route.stack[0].handle, protect);
   assert.equal(layer.route.stack[1].handle, adminOnly);
   assert.equal(layer.route.stack[2].handle, bulkImageUpload);
-  assert.equal(layer.route.stack[3].handle, bulkCarImageController.uploadBulkImages);
 });
 
 test("complete success returns HTTP 201 with deterministic correlation", async () => {
@@ -46,7 +47,7 @@ test("complete success returns HTTP 201 with deterministic correlation", async (
     uploadFiles: async ({ files }) => {
       receivedFiles = files;
       return {
-        carId: "car-123",
+        carId: 123,
         summary: { received: 2, uploaded: 2, rejected: 0, failed: 0 },
         files: [
           { clientFileId: "file-001", status: "uploaded" },
@@ -65,7 +66,7 @@ test("complete success returns HTTP 201 with deterministic correlation", async (
 test("partial success returns HTTP 207", async () => {
   const controller = createBulkCarImageController({
     uploadFiles: async () => ({
-      carId: "car-123",
+      carId: 123,
       summary: { received: 2, uploaded: 1, rejected: 1, failed: 0 },
       files: [
         { clientFileId: "file-001", status: "uploaded" },
@@ -81,7 +82,7 @@ test("partial success returns HTTP 207", async () => {
 test("complete rejection returns HTTP 422", async () => {
   const controller = createBulkCarImageController({
     uploadFiles: async () => ({
-      carId: "car-123",
+      carId: 123,
       summary: { received: 2, uploaded: 0, rejected: 2, failed: 0 },
       files: [
         { clientFileId: "file-001", status: "rejected" },

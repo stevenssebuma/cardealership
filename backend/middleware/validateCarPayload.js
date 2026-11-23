@@ -38,6 +38,8 @@ const PATCH_ALLOWED_FIELDS = new Set([
   "condition",
   "status",
   "description",
+  "transmission",
+  "fuelType",
   "power",
   "engine",
   "drive",
@@ -196,7 +198,7 @@ function validateImages(payload) {
 function validateOptionalTextFields(payload) {
   const errors = [];
 
-  for (const field of ["vin", "description"]) {
+  for (const field of ["vin", "description", "transmission", "fuelType"]) {
     const value = payload[field];
 
     if (value === undefined || value === null) {
@@ -210,6 +212,9 @@ function validateOptionalTextFields(payload) {
 
     if (hasScriptLikeContent(value)) {
       errors.push(`${field} contains unsupported content.`);
+    }
+    if (["transmission", "fuelType"].includes(field) && (!value.trim() || value.length > 100)) {
+      errors.push(`${field} must contain 1 to 100 characters or be null.`);
     }
   }
 
@@ -297,15 +302,7 @@ export function validateCarUpdatePayloadContract(payload = {}) {
     errors.push(...validateVin(cleanedPayload));
   }
 
-  if ("description" in cleanedPayload) {
-    const value = cleanedPayload.description;
-
-    if (value !== null && value !== undefined && typeof value !== "string") {
-      errors.push("description must be a valid text value.");
-    } else if (typeof value === "string" && hasScriptLikeContent(value)) {
-      errors.push("description contains unsupported content.");
-    }
-  }
+  errors.push(...validateOptionalTextFields(cleanedPayload));
 
   if ("condition" in cleanedPayload) {
     errors.push(...validateCondition(cleanedPayload));

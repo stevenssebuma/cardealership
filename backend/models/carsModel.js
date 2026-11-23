@@ -1,4 +1,5 @@
 import db from "../config/db.js";
+import { mapCarRow } from "../utils/databaseRows.js";
 import { canEditInventoryStatus } from "../utils/adminReviewPolicy.js";
 
 // GET ALL CARS
@@ -21,14 +22,14 @@ export const getAllCars = async () => {
       cs.engine,
       cs.drive,
       COALESCE((
-        SELECT json_group_array(json_object(
+        SELECT jsonb_agg(jsonb_build_object(
           'id', ci.id,
           'url', ci.image_url,
           'type', ci.image_type
-        ))
+        ) ORDER BY ci.id)
         FROM car_images ci
         WHERE ci.car_id = c.id
-      ), '[]') AS images,
+      ), '[]'::jsonb) AS images,
       (
         SELECT ci.image_url
         FROM car_images ci
@@ -43,15 +44,15 @@ export const getAllCars = async () => {
   `);
 
   return result.rows.map((car) => ({
-    ...car,
+    ...mapCarRow(car),
     images: parseImages(car.images),
   }));
 };
 
 // GET SINGLE CAR
 
-export const getCarById = async (id) => {
-  const car = await db.query(`
+export const getCarById = async (id, database = db) => {
+  const car = await database.query(`
     SELECT
       c.*,
       cs.power,
@@ -62,7 +63,7 @@ export const getCarById = async (id) => {
     WHERE c.id = $1;
   `, [id]);
 
-  const images = await db.query(`
+  const images = await database.query(`
     SELECT id, image_url, image_type
     FROM car_images
     WHERE car_id = $1
@@ -70,7 +71,7 @@ export const getCarById = async (id) => {
   `, [id]);
 
   return {
-    car: car.rows[0],
+    car: mapCarRow(car.rows[0]),
     images: images.rows,
   };
 };
@@ -92,19 +93,20 @@ export const createCar = async (data) => {
     condition,
     status,
     description,
+    transmission,
+    fuelType,
     power,
     engine,
     drive,
     images = [],
   } = data;
 
-  await db.query("BEGIN");
-
-  try {
+  return db.withTransaction(async (tx) => {
     const carInsert = `
       INSERT INTO cars (
         vin,
         make,
+        brand,
         model,
         name,
         type,
@@ -115,15 +117,17 @@ export const createCar = async (data) => {
         color,
         condition,
         status,
-        description
+        description,
+        transmission,
+        fuel_type
       )
       VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
+        $1,$2,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15
       )
       RETURNING id;
     `;
 
-    const carResult = await db.query(carInsert, [
+    const carResult = await tx.query(carInsert, [
       vin,
       make,
       model,
@@ -135,13 +139,15 @@ export const createCar = async (data) => {
       mileage,
       color,
       condition,
-      status,
+      status ?? "available",
       description ?? null,
+      transmission ?? null,
+      fuelType ?? null,
     ]);
 
     const carId = carResult.rows[0].id;
 
-    await db.query(
+    await tx.query(
       `
         INSERT INTO car_specs (
           car_id,
@@ -162,7 +168,7 @@ export const createCar = async (data) => {
           continue;
         }
 
-        await db.query(
+        await tx.query(
           `
             INSERT INTO car_images (
               car_id,
@@ -176,13 +182,8 @@ export const createCar = async (data) => {
       }
     }
 
-    await db.query("COMMIT");
-
     return carId;
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
+  });
 };
 
 // UPDATE CAR
@@ -202,6 +203,7 @@ export const updateCar = async (id, data) => {
     "condition",
     "status",
     "description",
+    "transmission",
   ];
 
   const specFields = ["power", "engine", "drive"];
@@ -209,21 +211,19 @@ export const updateCar = async (id, data) => {
   const carEntries = Object.entries(data).filter(
     ([field, value]) => allowedCarFields.includes(field) && value !== undefined,
   );
+  if (data.make !== undefined) carEntries.push(["brand", data.make]);
+  if (data.fuelType !== undefined) carEntries.push(["fuel_type", data.fuelType]);
 
   const specEntries = Object.entries(data).filter(
     ([field, value]) => specFields.includes(field) && value !== undefined,
   );
 
-  await db.query("BEGIN");
-
-  try {
-    const existing = await db.query(`SELECT id, status FROM cars WHERE id = $1;`, [id]);
+  return db.withTransaction(async (tx) => {
+    const existing = await tx.query(`SELECT id, status FROM cars WHERE id = $1 FOR UPDATE;`, [id]);
 
     if (existing.rowCount === 0) {
-      await db.query("ROLLBACK");
       return null;
     }
-
     if (data.status !== undefined && !canEditInventoryStatus(existing.rows[0].status, data.status)) {
       throw Object.assign(new Error('Invalid vehicle status transition'), { code: 'INVALID_STATUS_TRANSITION' });
     }
@@ -237,21 +237,20 @@ export const updateCar = async (id, data) => {
 
       values.push(id);
 
-      const updated = await db.query(
+      await tx.query(
         `
           UPDATE cars
           SET
             ${assignments.join(", ")},
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = $${values.length} AND status IS $${values.length + 1};
+            updated_at = NOW()
+          WHERE id = $${values.length};
         `,
-        [...values, existing.rows[0].status],
+        values,
       );
-      if (!updated.rowCount) throw Object.assign(new Error('Vehicle status changed; retry the update'), { code: 'INVALID_STATUS_TRANSITION' });
     }
 
     if (specEntries.length > 0) {
-      const currentSpecs = await db.query(
+      const currentSpecs = await tx.query(
         `
           SELECT power, engine, drive
           FROM car_specs
@@ -270,19 +269,20 @@ export const updateCar = async (id, data) => {
       };
 
       if (currentSpecs.rowCount > 0) {
-        await db.query(
+        await tx.query(
           `
             UPDATE car_specs
             SET
               power = $1,
               engine = $2,
-              drive = $3
+              drive = $3,
+              updated_at = CURRENT_TIMESTAMP
             WHERE car_id = $4;
           `,
           [nextSpecs.power, nextSpecs.engine, nextSpecs.drive, id],
         );
       } else {
-        await db.query(
+        await tx.query(
           `
             INSERT INTO car_specs (
               car_id,
@@ -297,40 +297,32 @@ export const updateCar = async (id, data) => {
       }
     }
 
-    await db.query("COMMIT");
-
-    return getCarById(id);
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
+    return getCarById(id, tx);
+  });
 };
 
 // DELETE CAR
 
 export const deleteCar = async (id) => {
-  await db.query("BEGIN");
-
-  try {
-    const existing = await db.query(
+  return db.withTransaction(async (tx) => {
+    const existing = await tx.query(
       `
         SELECT id, name
         FROM cars
-        WHERE id = $1;
+        WHERE id = $1 FOR UPDATE;
       `,
       [id],
     );
 
     if (existing.rowCount === 0) {
-      await db.query("ROLLBACK");
       return null;
     }
 
-    await db.query(`DELETE FROM car_images WHERE car_id = $1;`, [id]);
+    await tx.query(`DELETE FROM car_images WHERE car_id = $1;`, [id]);
 
-    await db.query(`DELETE FROM car_specs WHERE car_id = $1;`, [id]);
+    await tx.query(`DELETE FROM car_specs WHERE car_id = $1;`, [id]);
 
-    const result = await db.query(
+    const result = await tx.query(
       `
         DELETE FROM cars
         WHERE id = $1
@@ -339,18 +331,13 @@ export const deleteCar = async (id) => {
       [id],
     );
 
-    await db.query("COMMIT");
-
     return result.rows[0];
-  } catch (error) {
-    await db.query("ROLLBACK");
-    throw error;
-  }
+  });
 };
 
 // SAVE CAR IMAGE
 
-export const saveCarImage = async (carId, imageUrl, imageType = "general") => {
+export const saveCarImage = async (carId, imageUrl, imageType = "general", database = db) => {
   const query = `
     INSERT INTO car_images (
       car_id,
@@ -361,7 +348,7 @@ export const saveCarImage = async (carId, imageUrl, imageType = "general") => {
     RETURNING id, car_id, image_url, image_type;
   `;
 
-  const result = await db.query(query, [carId, imageUrl, imageType]);
+  const result = await database.query(query, [carId, imageUrl, imageType]);
 
   return result.rows[0];
 };

@@ -1,4 +1,6 @@
 import path from "node:path";
+
+// Local-storage compatibility: strip path components from either platform.
 import {
   BULK_IMAGE_UPLOAD_ERROR_CODES,
 } from "../contracts/bulkImageUpload.contract.js";

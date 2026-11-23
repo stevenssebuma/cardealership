@@ -1,5 +1,5 @@
 {
-  "name": "cardealership-backend",
+  "name": "car-dealership-backend",
   "version": "4.1.0",
   "description": "Panda Motors Car Dealership API",
   "type": "module",
@@ -7,12 +7,20 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "db:init": "node scripts/initDb.js",
+    "db:seed": "node seed.js",
+    "db:check": "node check-db.js",
+    "db:test": "node test-db.js",
+    "db:indexes": "node scripts/ensureCarSearchIndexes.js",
+    "db:admin": "node reset-admin.js",
+    "db:migration:export": "node scripts/exportMigrationSnapshot.js",
+    "db:migration:import": "node scripts/migrateLegacySnapshot.js",
+    "staging:smoke": "node scripts/stagingSmoke.js",
     "test": "node scripts/run-tests.js",
     "test:car-image-cleanup": "node tests/carImageCleanup.manual.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^13.0.3",
     "cloudinary": "^2.10.0",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -21,7 +29,6 @@
     "forwarded": "^0.2.0",
     "ipaddr.js": "^2.2.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.6.3",
     "multer": "^1.4.5-lts.1",
     "pdfkit": "^0.15.0",
     "pg": "^8.13.1",

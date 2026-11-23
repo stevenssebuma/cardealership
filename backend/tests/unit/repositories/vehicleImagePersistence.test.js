@@ -1,39 +1,36 @@
 "use strict";
 
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const os = require("node:os");
-const nodePath = require("node:path");
-const { createVehicleRepository } = require("../../../repositories/vehicleRepository");
-const { createVehicleImageRepository } = require("../../../repositories/vehicleImageRepository");
-const { createLocalImageStorage } = require("../../../services/storage/localImageStorage");
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import nodePath from "node:path";
+import { createCarLookupRepository, createCarImageRepository } from "../../../repositories/bulkCarImageRepository.js";
+import { createLocalImageStorage } from "../../../services/storage/localImageStorage.js";
 
-test("vehicle repository performs deterministic ID lookup", async () => {
-  const activity = {};
-  const expectedVehicle = { id: "vehicle-1" };
-  const repository = createVehicleRepository({
-    findById(vehicleId) {
-      activity.vehicleId = vehicleId;
-      return { exec: async () => expectedVehicle };
-    }
-  });
-  const result = await repository.findById("vehicle-1");
-  assert.equal(activity.vehicleId, "vehicle-1");
-  assert.equal(result, expectedVehicle);
+test("canonical vehicle repository performs a parameterized numeric ID lookup", async () => {
+  const queries = [];
+  const repository = createCarLookupRepository({ async query(sql, values) {
+    queries.push({ sql, values });
+    return { rows: sql.includes("FROM cars c") ? [{ id: 7, price: "12500.50" }] : [] };
+  } });
+  assert.equal(await repository.findById("invalid"), null);
+  assert.equal(queries.length, 0);
+  assert.deepEqual(await repository.findById("7"), { id: 7, price: 12500.50 });
+  assert.ok(queries.every(q => q.values[0] === 7));
 });
 
-test("vehicle image repository saves supplied metadata", async () => {
-  const activity = {};
-  const repository = createVehicleImageRepository({
-    create: async (metadata) => {
-      activity.metadata = metadata;
-      return { id: "image-1", ...metadata };
-    }
-  });
-  const result = await repository.save({ vehicleId: "vehicle-1", clientFileId: "file-1" });
-  assert.equal(activity.metadata.clientFileId, "file-1");
-  assert.equal(result.id, "image-1");
+test("canonical image repository saves URL and image type using PostgreSQL", async () => {
+  let captured;
+  const repository = createCarImageRepository({ async query(sql, values) {
+    captured = { sql, values };
+    return { rows: [{ id: 1, car_id: values[0], image_url: values[1], image_type: values[2] }] };
+  } });
+  const image = await repository.create({ carId: 7, url: "https://example.invalid/car.jpg", displayOrder: 1 });
+  assert.match(captured.sql, /INSERT INTO car_images/);
+  assert.deepEqual(captured.values, [7, "https://example.invalid/car.jpg", "general"]);
+  assert.equal(image.carId, 7);
+  await assert.rejects(repository.create({ carId: 0, url: "invalid" }), TypeError);
 });
 
 test("local storage writes and removes an image safely", async () => {

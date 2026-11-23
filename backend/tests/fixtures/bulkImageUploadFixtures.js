@@ -30,10 +30,7 @@ const bulkUploadMatrix = Object.freeze([
     files: Object.freeze([
       createImageFile("file-001"),
       createImageFile("file-002", {
-        validationError: Object.freeze({
-          code: "UNSUPPORTED_MIME_TYPE",
-          message: "Unsupported image type."
-        })
+        mimetype: "application/octet-stream"
       }),
       createImageFile("file-003")
     ]),
@@ -85,7 +82,4 @@ const bulkUploadMatrix = Object.freeze([
   })
 ]);
 
-module.exports = Object.freeze({
-  createImageFile,
-  bulkUploadMatrix
-});
+export { createImageFile, bulkUploadMatrix };

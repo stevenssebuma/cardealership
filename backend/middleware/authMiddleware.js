@@ -27,7 +27,7 @@ export function rateLimitLogin(req, res, next) {
   next();
 }
 
-export async function authenticateToken(req, res, next) {
+export async function authenticateTokenWithDatabase(req, res, next, database) {
   try {
     const header = req.headers.authorization || '';
     if (!header.startsWith('Bearer ')) {
@@ -42,7 +42,7 @@ export async function authenticateToken(req, res, next) {
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 
-    const result = await db.query(
+    const result = await database.query(
       'SELECT id, name, email, role FROM users WHERE id = $1',
       [decoded.id]
     );
@@ -57,6 +57,10 @@ export async function authenticateToken(req, res, next) {
     console.error('auth error:', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
+}
+
+export function authenticateToken(req, res, next) {
+  return authenticateTokenWithDatabase(req, res, next, db);
 }
 
 export function isAdmin(req, res, next) {

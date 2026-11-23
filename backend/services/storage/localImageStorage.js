@@ -1,11 +1,13 @@
 "use strict";
 
-const fs = require("node:fs");
-const nodePath = require("node:path");
-const crypto = require("node:crypto");
-const { sanitizeImageFilename } = require("../../utils/validateImageUpload");
+import fs from "node:fs";
+import nodePath from "node:path";
+import crypto from "node:crypto";
+import { sanitizeImageFilename } from "../../utils/validateImageUpload.js";
+import { fileURLToPath } from "node:url";
+const __dirname = nodePath.dirname(fileURLToPath(import.meta.url));
 
-const createLocalImageStorage = (options = {}) => {
+export const createLocalImageStorage = (options = {}) => {
   const storageRoot = nodePath.resolve(options.storageRoot || nodePath.join(__dirname, "../../uploads/cars"));
   const publicPrefix = options.publicPrefix || "/uploads/cars";
 
@@ -49,7 +51,3 @@ const createLocalImageStorage = (options = {}) => {
     resolveStoragePath
   });
 };
-
-module.exports = Object.freeze({
-  createLocalImageStorage
-});

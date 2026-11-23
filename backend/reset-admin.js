@@ -1,21 +1,25 @@
-import 'dotenv/config';
+import db from './config/db.js';
 import bcrypt from 'bcryptjs';
-import { resolveAdministratorReset } from './config/security.js';
+import { assertMutationTarget, verifyTarget, requireReady, runOperation, operationError } from './scripts/databaseOperations.js';
 
-const { email, password } = resolveAdministratorReset();
-const { default: db } = await import('./config/db.js');
-const hash = await bcrypt.hash(password, 10);
-
-const existing = await db.query('SELECT id, role FROM users WHERE email = ?', [email]);
-if (existing.rows.length > 0) {
-  if (existing.rows[0].role !== 'admin') throw new Error('Refusing to promote an existing non-administrator account.');
-  await db.query("UPDATE users SET password = ? WHERE email = ? AND role = 'admin'", [hash, email]);
-  console.log('Administrator password reset successfully.');
-} else {
-  await db.query(
-    "INSERT INTO users (name, email, password, role) VALUES ('Admin', ?, ?, 'admin')",
-    [email, hash]
-  );
-  console.log('Administrator created successfully.');
-}
-process.exit(0);
+await runOperation(async () => {
+  const config = assertMutationTarget();
+  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME?.trim() || 'Staging Administrator';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
+      typeof password !== 'string' || password.length < 14 || Buffer.byteLength(password) > 72 || name.length > 160) {
+    throw operationError('ADMIN_CREDENTIALS_INVALID');
+  }
+  const hash = await bcrypt.hash(password, 12);
+  return db.withTransaction(async tx => {
+    await verifyTarget(tx, config.database);
+    await tx.query('SELECT pg_advisory_xact_lock(17022)');
+    await requireReady(tx);
+    const { rows: [user] } = await tx.query('SELECT id,role FROM public.users WHERE lower(email)=$1 FOR UPDATE', [email]);
+    if (user && user.role !== 'admin') throw operationError('NON_ADMIN_ACCOUNT_COLLISION');
+    if (user) await tx.query('UPDATE public.users SET password=$1 WHERE id=$2', [hash,user.id]);
+    else await tx.query("INSERT INTO public.users (name,email,password,role) VALUES ($1,$2,$3,'admin')", [name,email,hash]);
+    return { success: true, status: user ? 'ROTATED' : 'CREATED' };
+  });
+}, db.close);
