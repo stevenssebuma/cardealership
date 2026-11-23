@@ -1,10 +1,18 @@
 import path from "node:path";
+
+// Local-storage compatibility: strip path components from either platform.
 import {
   BULK_IMAGE_UPLOAD_ERROR_CODES,
 } from "../contracts/bulkImageUpload.contract.js";
 
 const createValidationError = (code, message) =>
   Object.assign(new Error(message), { code });
+
+export const sanitizeImageFilename = (value) => {
+  const basename = path.posix.basename(String(value ?? '').replace(/\\/g, '/'));
+  const safe = basename.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/^\.+/, '');
+  return safe || 'image';
+};
 
 export const createImageUploadValidator = (configuration) => {
   if (!configuration) {

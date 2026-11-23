@@ -1,141 +1,134 @@
-// backend/config/db.js
-import Database from 'better-sqlite3';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// Canonical PostgreSQL persistence adapter (TSK-022).
+// No schema mutation, fixture creation or network connection occurs on import.
+import "dotenv/config";
+import pg from "pg";
+import { buildPoolConfig } from "./databasePoolConfig.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { Pool } = pg;
+const transactionCommand = /^(?:BEGIN|START\s+TRANSACTION|COMMIT|END|ROLLBACK|ABORT|SAVEPOINT|RELEASE\s+SAVEPOINT|SET\s+TRANSACTION)\b/i;
 
-const dbPath = path.join(__dirname, '..', 'data.sqlite');
-const sqlite = new Database(dbPath);
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('foreign_keys = ON');
+function errorCode(error) {
+  return typeof error?.code === "string" && /^[A-Z0-9_]{1,40}$/i.test(error.code)
+    ? error.code
+    : "DATABASE_ERROR";
+}
 
-// Create tables on first run
-sqlite.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT DEFAULT 'user',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS cars (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    brand TEXT,
-    price REAL,
-    year INTEGER,
-    status TEXT DEFAULT 'available',
-    image_url TEXT,
-    description TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS car_specs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    car_id INTEGER NOT NULL UNIQUE,
-    power TEXT,
-    engine TEXT,
-    drive TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE
-  );
-
-  CREATE INDEX IF NOT EXISTS car_specs_car_id_idx ON car_specs(car_id);
-
-  CREATE TABLE IF NOT EXISTS car_images (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    car_id INTEGER NOT NULL,
-    image_url TEXT NOT NULL,
-    image_type TEXT NOT NULL DEFAULT 'general',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE
-  );
-
-  CREATE INDEX IF NOT EXISTS car_images_car_id_idx ON car_images(car_id);
-
-  CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    car_id INTEGER NOT NULL,
-    booking_date TEXT NOT NULL,
-    time_slot TEXT NOT NULL,
-    notes TEXT,
-    status TEXT DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE CASCADE
-  );
-
-  CREATE UNIQUE INDEX IF NOT EXISTS uniq_booking
-    ON bookings(car_id, booking_date, time_slot)
-    WHERE status NOT IN ('cancelled','completed');
-`);
-
-const ensureColumn = (tableName, columnName, definition) => {
-  const columns = sqlite.prepare(`PRAGMA table_info(${tableName})`).all();
-  if (!columns.some((column) => column.name === columnName)) {
-    sqlite.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+function assertQuery(text, params) {
+  if (typeof text !== "string" || !text.trim() || !Array.isArray(params)) {
+    throw new TypeError("query requires non-empty SQL text and an array of parameters.");
   }
-};
-
-for (const [columnName, definition] of [
-  ['vin', 'TEXT'],
-  ['make', 'TEXT'],
-  ['model', 'TEXT'],
-  ['type', 'TEXT'],
-  ['category', 'TEXT'],
-  ['mileage', 'INTEGER'],
-  ['color', 'TEXT'],
-  ['condition', 'TEXT'],
-  ['updated_at', 'DATETIME DEFAULT CURRENT_TIMESTAMP'],
-]) {
-  ensureColumn('cars', columnName, definition);
 }
 
-for (const [columnName, definition] of [
-  ['power', 'TEXT'],
-  ['drive', 'TEXT'],
-]) {
-  ensureColumn('car_specs', columnName, definition);
+function firstCommand(text) {
+  return text.replace(/^(?:\s|--[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)*/u, "");
 }
 
-// Postgres-style adapter so existing code keeps working
-const db = {
-  async query(text, params = []) {
-    // Translate $1, $2 ... to ? placeholders
-    const sql = text.replace(/\$\d+/g, '?');
-    const trimmed = sql.trim().toUpperCase();
+export function createDatabaseAdapter({
+  environment = process.env,
+  PoolClass = Pool,
+  logger = console,
+} = {}) {
+  let pool;
+  let closed = false;
+  let closePromise;
 
-    try {
-      if (trimmed.startsWith('SELECT') || trimmed.startsWith('WITH')) {
-        const rows = sqlite.prepare(sql).all(...params);
-        return { rows, rowCount: rows.length };
-      }
-
-      if (trimmed.startsWith('INSERT') || trimmed.startsWith('UPDATE') || trimmed.startsWith('DELETE')) {
-        const hasReturning = /RETURNING/i.test(sql);
-        if (hasReturning) {
-          const rows = sqlite.prepare(sql).all(...params);
-          return { rows, rowCount: rows.length };
-        }
-        const info = sqlite.prepare(sql).run(...params);
-        return { rows: [], rowCount: info.changes, lastInsertRowid: info.lastInsertRowid };
-      }
-
-      sqlite.prepare(sql).run(...params);
-      return { rows: [], rowCount: 0 };
-    } catch (err) {
-      console.error('SQL error:', err.message, '\nSQL:', sql);
-      throw err;
+  const getPool = () => {
+    if (closed) throw new Error("PostgreSQL adapter is closed.");
+    if (!pool) {
+      pool = new PoolClass(buildPoolConfig(environment));
+      pool.on("error", (error) => {
+        // Do not log SQL, parameters, detail fields or connection URLs.
+        logger.error("PostgreSQL idle client error", { code: errorCode(error) });
+      });
     }
-  },
-  raw: sqlite
-};
+    return pool;
+  };
 
+  const query = async (text, params = []) => {
+    assertQuery(text, params);
+    if (transactionCommand.test(firstCommand(text))) {
+      throw new Error("Use withTransaction for connection-scoped transactions.");
+    }
+    // Retain native PostgreSQL rows/rowCount; consumer-specific coercion
+    // belongs at API boundaries, not in the shared adapter.
+    // Extended protocol enforces a single statement even when params is empty.
+    // This prevents a second statement from leaving a shared pool client in
+    // a transaction that bypasses the leading-command guard.
+    return getPool().query({ text, values: params, queryMode: "extended" });
+  };
+
+  const withTransaction = async (work) => {
+    if (typeof work !== "function") {
+      throw new TypeError("withTransaction requires a callback.");
+    }
+    const client = await getPool().connect();
+    let started = false;
+    let discardError;
+    try {
+      await client.query("BEGIN");
+      started = true;
+      let active = true;
+      const tx = Object.freeze({
+        query: async (text, params = []) => {
+          if (!active) throw new Error("Transaction scope has ended.");
+          assertQuery(text, params);
+          if (transactionCommand.test(firstCommand(text))) {
+            throw new Error("Transaction control belongs to withTransaction.");
+          }
+          return client.query({ text, values: params, queryMode: "extended" });
+        },
+      });
+      let result;
+      try {
+        result = await work(tx);
+      } finally {
+        active = false;
+      }
+      const outcome = await client.query("COMMIT");
+      started = false;
+      if (outcome.command !== "COMMIT") {
+        throw new Error("PostgreSQL transaction did not commit.");
+      }
+      return result;
+    } catch (error) {
+      if (started) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          discardError = rollbackError;
+          logger.error("PostgreSQL rollback failed", { code: errorCode(rollbackError) });
+        }
+      } else {
+        discardError = error;
+      }
+      throw error;
+    } finally {
+      // Do not return a connection with an uncertain transaction state.
+      client.release(discardError);
+    }
+  };
+
+  const verifyDatabaseConnection = async () => {
+    try {
+      const result = await query("SELECT 1 AS ok");
+      return { connected: result.rows[0]?.ok === 1 };
+    } catch (error) {
+      return { connected: false, code: errorCode(error) };
+    }
+  };
+
+  const close = () => {
+    if (closePromise) return closePromise;
+    closed = true;
+    closePromise = pool ? Promise.resolve().then(() => pool.end()) : Promise.resolve();
+    return closePromise;
+  };
+
+  return Object.freeze({ query, withTransaction, verifyDatabaseConnection, close });
+}
+
+const db = createDatabaseAdapter();
+export const withTransaction = db.withTransaction;
+export const verifyDatabaseConnection = db.verifyDatabaseConnection;
+export const closeDatabase = db.close;
 export default db;

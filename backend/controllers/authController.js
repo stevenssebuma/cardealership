@@ -22,7 +22,7 @@ export async function register(req, res) {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    const existing = await db.query('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
+    const existing = await db.query('SELECT id FROM users WHERE lower(email) = $1', [normalizedEmail]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ success: false, message: 'Email already registered' });
     }
@@ -31,7 +31,7 @@ export async function register(req, res) {
 
     const result = await db.query(
       `INSERT INTO users (name, email, password, role)
-       VALUES (?, ?, ?, 'user')
+       VALUES ($1, $2, $3, 'user')
        RETURNING id, name, email, role, created_at`,
       [name.trim(), normalizedEmail, passwordHash]
     );
@@ -41,7 +41,8 @@ export async function register(req, res) {
 
     res.status(201).json({ success: true, message: 'Registered successfully', user, token });
   } catch (err) {
-    console.error('register error:', err.message);
+    if (err.code === '23505') return res.status(409).json({ success: false, message: 'Email already registered' });
+    console.error('register error:', err.code || 'AUTH_FAILURE');
     res.status(500).json({ success: false, message: 'Registration failed' });
   }
 }
@@ -56,7 +57,7 @@ export async function login(req, res) {
     }
 
     const result = await db.query(
-      'SELECT id, name, email, password, role FROM users WHERE email = ?',
+      'SELECT id, name, email, password, role FROM users WHERE lower(email) = $1',
       [email.toLowerCase().trim()]
     );
 
@@ -107,7 +108,7 @@ export async function changePassword(req, res) {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
     }
 
-    const result = await db.query('SELECT password FROM users WHERE id = ?', [req.user.id]);
+    const result = await db.query('SELECT password FROM users WHERE id = $1', [req.user.id]);
     const user = result.rows[0];
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
@@ -115,7 +116,7 @@ export async function changePassword(req, res) {
     if (!ok) return res.status(401).json({ success: false, message: 'Current password is incorrect' });
 
     const hash = await bcrypt.hash(newPassword, 10);
-    await db.query('UPDATE users SET password = ? WHERE id = ?', [hash, req.user.id]);
+    await db.query('UPDATE users SET password = $1 WHERE id = $2', [hash, req.user.id]);
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
@@ -141,7 +142,7 @@ export async function getAllUsers(req, res) {
 export async function deleteUser(req, res) {
   try {
     const { id } = req.params;
-    const result = await db.query('DELETE FROM users WHERE id = ? RETURNING id', [id]);
+    const result = await db.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }

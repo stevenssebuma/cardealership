@@ -8,12 +8,11 @@ import 'dotenv/config';
 
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { buildPoolConfig } from './config/databasePoolConfig.js';
+import { closeDatabase } from './config/db.js';
+import { inspectDatabaseReadiness } from './config/databaseReadiness.js';
+import { resolveRuntimeSecurity } from './config/security.js';
+import { exchangeRateRefreshWorker } from './workers/exchangeRateRefreshWorker.js';
 
 
 // ============================================
@@ -23,15 +22,42 @@ import authRoutes from './routes/authRoutes.js';
 import carsRoutes from './routes/carsRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import exchangeRateRoutes from './routes/exchangeRateRoutes.js';
+import { attachExchangeRateWorker } from './workers/exchangeRateWorkerLifecycle.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const localOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
+const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS !== undefined
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map(value => value.trim()).filter(Boolean)
+  : ['production','staging'].includes(process.env.NODE_ENV) ? [] : localOrigins;
+try {
+  buildPoolConfig();
+  if (!process.env.JWT_SECRET?.trim()) throw new Error('AUTH_CONFIG_INVALID');
+  // Preserve Sprint 15 production secrets and exact HTTPS CORS requirements.
+  if (process.env.NODE_ENV === 'production') resolveRuntimeSecurity();
+  if (['production','staging'].includes(process.env.NODE_ENV) &&
+      (Buffer.byteLength(process.env.JWT_SECRET || '', 'utf8') < 32 ||
+       /^(replace|change|example|your[_-])/i.test(process.env.JWT_SECRET || ''))) {
+    throw new Error('AUTH_CONFIG_INVALID');
+  }
+  if (process.env.NODE_ENV === 'production' && !allowedOrigins.length) {
+    throw new Error('CORS_CONFIG_INVALID');
+  }
+  for (const origin of allowedOrigins) {
+    const url = new URL(origin);
+    if (!['http:', 'https:'].includes(url.protocol) || url.origin !== origin) throw new Error('CORS_CONFIG_INVALID');
+  }
+} catch {
+  console.error('API configuration invalid; verify database, JWT and CORS settings.');
+  process.exit(1);
+}
 
 // ============================================
 // MIDDLEWARE
 // ============================================
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json());
@@ -53,6 +79,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/cars', carsRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/exchange-rates', exchangeRateRoutes);
 
 // ============================================
 // HEALTH CHECK
@@ -81,10 +108,30 @@ app.get('/api/health', (req, res) => {
       'PUT  /api/admin/cars/:id/approve',
       'PUT  /api/admin/cars/:id/reject',
       'PUT  /api/admin/cars/:id',
-      'DELETE /api/admin/cars/:id'
+      'DELETE /api/admin/cars/:id',
+      'GET  /api/exchange-rates'
     ]
   });
 });
+
+app.get('/api/ready', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  let ready = false;
+  try { ready = (await inspectDatabaseReadiness()).ready; } catch { /* Public response contains no database details. */ }
+  res.status(ready ? 200 : 503).json({ success: ready, status: ready ? 'READY' : 'NOT_READY' });
+});
+
+// Opt-in staging identity; never exposes credentials or database details.
+if (process.env.NODE_ENV === 'staging' && process.env.STAGING_DEPLOYMENT_ID) {
+  app.get('/api/staging-info', (req, res) => {
+    const revision = process.env.RENDER === 'true' ? process.env.RENDER_GIT_COMMIT : process.env.STAGING_SOURCE_REVISION;
+    res.set('Cache-Control', 'no-store').json({
+      environment: 'staging',
+      deployment: process.env.STAGING_DEPLOYMENT_ID,
+      revision: /^[a-f0-9]{40}$/.test(revision ?? '') ? revision : null,
+    });
+  });
+}
 
 // ============================================
 // ROOT
@@ -135,7 +182,7 @@ app.use((err, req, res, next) => {
 // ============================================
 // START SERVER
 // ============================================
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('========================================');
   console.log(`?? Panda Motors API running on http://localhost:${PORT}`);
   console.log(`?? Health check: http://localhost:${PORT}/api/health`);
@@ -145,5 +192,31 @@ app.listen(PORT, () => {
   console.log('   /api/cars');
   console.log('   /api/bookings');
   console.log('   /api/admin');
+  console.log('   /api/exchange-rates');
   console.log('========================================\n');
+});
+attachExchangeRateWorker(server);
+
+let shuttingDown = false;
+function shutdown(exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  exchangeRateRefreshWorker.stop();
+  const timeout = setTimeout(() => process.exit(1), 10000);
+  timeout.unref();
+  server.close(async () => {
+    try {
+      await exchangeRateRefreshWorker.drain();
+      await closeDatabase();
+      process.exitCode = exitCode;
+    } catch { process.exitCode = 1; }
+    clearTimeout(timeout);
+  });
+  server.closeIdleConnections?.();
+}
+process.once('SIGTERM', () => shutdown());
+process.once('SIGINT', () => shutdown());
+server.once('error', () => {
+  console.error('API listener unavailable.');
+  shutdown(1);
 });

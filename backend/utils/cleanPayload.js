@@ -12,7 +12,7 @@ export const CAR_REQUIRED_TEXT_FIELDS = [
   "drive",
 ];
 
-export const CAR_OPTIONAL_TEXT_FIELDS = ["vin", "description"];
+export const CAR_OPTIONAL_TEXT_FIELDS = ["vin", "description", "transmission", "fuelType"];
 
 export const CAR_NUMERIC_FIELDS = ["year", "price", "mileage"];
 

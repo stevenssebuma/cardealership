@@ -1,12 +1,10 @@
-"use strict";
-
-const test = require("node:test");
-const assert = require("node:assert/strict");
-const { createExchangeRateService } = require("../../services/exchangeRates/exchangeRateService");
-const { createBulkCarImageUploadService } = require("../../services/bulkCarImageUploadService");
-const { createExchangeRateRefreshWorker } = require("../../workers/exchangeRateRefreshWorker");
-const { FIXED_TIME, createSnapshot, providerCacheMatrix } = require("../fixtures/exchangeRateFixtures");
-const { bulkUploadMatrix } = require("../fixtures/bulkImageUploadFixtures");
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createExchangeRateService } from '../../services/exchangeRates/exchangeRateService.js';
+import { createBulkCarImageUploadService } from '../../services/bulkCarImageUploadService.js';
+import { createExchangeRateRefreshWorker } from '../../workers/exchangeRateRefreshWorker.js';
+import { FIXED_TIME, createSnapshot, providerCacheMatrix } from '../fixtures/exchangeRateFixtures.js';
+import { bulkUploadMatrix } from '../fixtures/bulkImageUploadFixtures.js';
 
 for (const scenario of providerCacheMatrix) {
   test(`exchange-rate graph: ${scenario.name}`, async () => {
@@ -14,6 +12,7 @@ for (const scenario of providerCacheMatrix) {
     let persistenceCalls = 0;
 
     const service = createExchangeRateService({
+      config: { provider: "mock" },
       now: () => new Date(FIXED_TIME),
       cacheTtlMs: 7200000,
       provider: {
@@ -67,42 +66,31 @@ for (const scenario of bulkUploadMatrix) {
     };
 
     const service = createBulkCarImageUploadService({
-      vehicleRepository: {
-        findById: async (vehicleId) => scenario.vehicleExists ? { id: vehicleId } : null
+      carRepository: {
+        findById: async (carId) => scenario.vehicleExists ? { id: carId } : null
       },
-      imageStorage: {
-        store: async (file) => {
+      storage: {
+        upload: async ({ carId, file }) => {
           activity.storageCalls.push(file.clientFileId);
-          if (scenario.storageFailureIds.includes(file.clientFileId)) {
-            throw new Error("Storage failure");
-          }
-          return {
-            storageKey: `cars/${file.vehicleId}/${file.clientFileId}`,
-            url: `/uploads/${file.fileName}`
-          };
+          if (scenario.storageFailureIds.includes(file.clientFileId)) throw new Error('Storage failure');
+          return { publicId: `cars/${carId}/${file.clientFileId}`, url: `/uploads/${file.originalname}` };
         },
-        remove: async (storageKey) => {
-          activity.cleanupCalls.push(storageKey.split("/").at(-1));
-        }
+        remove: async (publicId) => { activity.cleanupCalls.push(publicId.split('/').at(-1)); }
       },
       imageRepository: {
-        save: async (metadata) => {
-          activity.persistenceCalls.push(metadata.clientFileId);
-          if (scenario.persistenceFailureIds.includes(metadata.clientFileId)) {
-            throw new Error("Persistence failure");
-          }
-          return {
-            id: `image-${metadata.clientFileId}`,
-            url: metadata.url
-          };
+        create: async (metadata) => {
+          const clientFileId = metadata.fileName.replace(/\.[^.]+$/, '');
+          activity.persistenceCalls.push(clientFileId);
+          if (scenario.persistenceFailureIds.includes(clientFileId)) throw new Error('Persistence failure');
+          return { id: `image-${clientFileId}`, url: metadata.url };
         }
       }
     });
 
     if (scenario.expectedErrorCode) {
       await assert.rejects(
-        service.processBulkUpload({
-          vehicleId: "car-123",
+        service.uploadFiles({
+          carId: "car-123",
           files: scenario.files
         }),
         (error) => error.code === scenario.expectedErrorCode
@@ -111,8 +99,8 @@ for (const scenario of bulkUploadMatrix) {
       return;
     }
 
-    const result = await service.processBulkUpload({
-      vehicleId: "car-123",
+    const result = await service.uploadFiles({
+      carId: "car-123",
       files: scenario.files
     });
 

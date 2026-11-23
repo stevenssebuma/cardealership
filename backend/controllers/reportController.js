@@ -1,4 +1,4 @@
-import db from '../config/database.js';
+import { analyticsRepository } from '../repositories/analyticsRepository.js';
 import PDFGenerator from '../utils/pdfGenerator.js';
 
 export const reportController = {
@@ -9,7 +9,7 @@ export const reportController = {
     async generateInventoryReport(req, res) {
         try {
             // Get inventory data
-            const cars = await db.collection('cars').find({}).toArray();
+            const cars = await analyticsRepository.listInventory();
             
             if (!cars || cars.length === 0) {
                 return res.status(404).json({
@@ -49,11 +49,11 @@ export const reportController = {
             res.send(buffer);
 
         } catch (error) {
-            console.error('PDF Generation Error:', error);
+            console.error('PDF Generation Error:', error.code || 'REPORT_FAILED');
             res.status(500).json({
                 success: false,
                 error: 'Failed to generate inventory report',
-                message: error.message
+                message: 'Unable to generate inventory report.'
             });
         }
     },
@@ -64,7 +64,7 @@ export const reportController = {
      */
     async getInventoryJSON(req, res) {
         try {
-            const cars = await db.collection('cars').find({}).toArray();
+            const cars = await analyticsRepository.listInventory();
             
             const { sortBy = 'make', sortOrder = 'asc' } = req.query;
             const sortedCars = this.sortInventory(cars, sortBy, sortOrder);
@@ -80,10 +80,10 @@ export const reportController = {
             });
 
         } catch (error) {
-            console.error('JSON Report Error:', error);
+            console.error('JSON Report Error:', error.code || 'REPORT_FAILED');
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Unable to generate inventory report.'
             });
         }
     },
@@ -94,7 +94,7 @@ export const reportController = {
      */
     async getInventorySummary(req, res) {
         try {
-            const cars = await db.collection('cars').find({}).toArray();
+            const cars = await analyticsRepository.listInventory();
             
             if (!cars || cars.length === 0) {
                 return res.status(404).json({
@@ -112,10 +112,10 @@ export const reportController = {
             });
 
         } catch (error) {
-            console.error('Summary Error:', error);
+            console.error('Summary Error:', error.code || 'REPORT_FAILED');
             res.status(500).json({
                 success: false,
-                error: error.message
+                error: 'Unable to generate inventory report.'
             });
         }
     },
@@ -125,9 +125,10 @@ export const reportController = {
      */
     sortInventory(cars, sortBy, sortOrder) {
         const order = sortOrder === 'desc' ? -1 : 1;
+        if (!['make','model','name','year','price','condition','status','transmission'].includes(sortBy)) sortBy = 'make';
         return [...cars].sort((a, b) => {
-            const valA = a[sortBy] || '';
-            const valB = b[sortBy] || '';
+            const valA = a[sortBy] ?? '';
+            const valB = b[sortBy] ?? '';
             
             if (typeof valA === 'number' && typeof valB === 'number') {
                 return (valA - valB) * order;
@@ -142,12 +143,13 @@ export const reportController = {
      */
     calculateSummary(cars) {
         const total = cars.length;
-        const totalValue = cars.reduce((sum, car) => sum + car.price, 0);
-        const avgPrice = total > 0 ? totalValue / total : 0;
-        const minPrice = total > 0 ? Math.min(...cars.map(c => c.price)) : 0;
-        const maxPrice = total > 0 ? Math.max(...cars.map(c => c.price)) : 0;
+        const priced = cars.filter(car => typeof car.price === 'number');
+        const totalValue = priced.reduce((sum, car) => sum + car.price, 0);
+        const avgPrice = priced.length ? totalValue / priced.length : 0;
+        const minPrice = priced.length ? priced.reduce((min,c)=>Math.min(min,c.price),Infinity) : 0;
+        const maxPrice = priced.length ? priced.reduce((max,c)=>Math.max(max,c.price),-Infinity) : 0;
 
-        const makeCount = {};
+        const makeCount = Object.create(null);
         cars.forEach(car => {
             makeCount[car.make] = (makeCount[car.make] || 0) + 1;
         });

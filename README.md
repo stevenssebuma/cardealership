@@ -55,7 +55,7 @@ From the repository root:
 
 ```bash
 cd backend
-npm install
+npm ci
 ```
 
 Start the backend:
@@ -64,7 +64,8 @@ Start the backend:
 npm run dev
 ```
 
-The backend defaults to `http://localhost:5500` when `PORT` is not overridden.
+The backend defaults to port 5000 when `PORT` is not overridden. The examples
+below explicitly configure port 5500 to match the frontend.
 
 ## Frontend environment setup
 
@@ -94,9 +95,11 @@ At minimum, configure:
 
 ```dotenv
 PORT=5500
-DATABASE_URL=postgresql://database-user:database-password@localhost:5432/car_dealership
+NODE_ENV=development
+DATABASE_URL=postgresql://database-user:database-password@localhost:5432/cardealership_dev
 JWT_SECRET=replace-with-a-long-random-secret
 SITE_URL=http://localhost:5173
+CORS_ALLOWED_ORIGINS=http://localhost:5173
 ```
 
 Keep the real `.env` file untracked.
@@ -105,6 +108,18 @@ Keep the real `.env` file untracked.
 
 The backend requires PostgreSQL for persistent users, inventory, and database-backed features. Create the configured database and grant the configured account the required privileges before starting live API validation.
 
+For a newly created, empty development database, run from `backend/`:
+
+```bash
+npm run db:init -- --confirm cardealership_dev
+npm run db:check
+```
+
+Do not use this command on an existing production database. Tests require
+`TEST_DATABASE_URL` pointing to a separate test database. See
+[PostgreSQL operations](backend/docs/POSTGRESQL-OPERATIONS.md) for the
+guarded initialization, seed, admin rotation, diagnostics and staging procedures.
+
 Database-dependent endpoints must not be reported as working when PostgreSQL is unavailable. Record database connection failures as environment blockers.
 
 ## Development startup order
@@ -112,7 +127,7 @@ Database-dependent endpoints must not be reported as working when PostgreSQL is 
 1. Install root frontend dependencies.
 2. Install dependencies inside `backend/`.
 3. Create local frontend and backend environment files.
-4. Start PostgreSQL.
+4. Start PostgreSQL and initialize the dedicated development database explicitly.
 5. Start the backend from `backend/`.
 6. Start the frontend from the repository root.
 7. Run manual API requests and deterministic tests.
@@ -243,13 +258,13 @@ Open a request file in an HTTP-client-enabled editor, confirm the local API orig
 Run the frontend regression suite:
 
 ```bash
-npm run test:regression
+npm test -- regression
 ```
 
 Run API configuration validation:
 
 ```bash
-npm run test:api-config
+npm test -- api-config
 ```
 
 Run the backend image-cleanup validation:
@@ -257,6 +272,8 @@ Run the backend image-cleanup validation:
 ```bash
 npm --prefix backend run test:car-image-cleanup
 ```
+
+The consolidated test runner discovers every frontend `.manual.ts` test and retains the historical suite names through `npm test -- <suite>`. List available suites with `npm run test:list`. Run all frontend tests with `npm test`, all automated backend tests with `npm run test:backend`, or both with `npm run test:all`. The runner reports failures and exits nonzero; it does not hide inherited failures. `npm test -- sprint7-release` also attempts a production build using the operator's actual configured environment after its tests succeed. Use `npm ci` in both package directories to reproduce the committed lockfiles.
 
 ## Production build
 
@@ -343,7 +360,7 @@ Run the complete Sprint 9 backend test suite:
 
 cd backend
 
-npm run test:sprint9
+npm test
 
 ```
 
@@ -400,15 +417,14 @@ Edwin's Sprint 4 backend implementation provides a safe cleanup workflow for sta
 ```text
 cd backend
 npm run test:car-image-cleanup
-npm run cleanup:car-images
-npm run cleanup:car-images:job
+node scripts/cleanupStaleCarImages.js --dry-run
 ```
 
 The execute command exists but must not be used until storage-provider behavior, production credentials, and destructive-cleanup ownership are approved:
 
 ```text
 cd backend
-npm run cleanup:car-images:execute
+node scripts/cleanupStaleCarImages.js --execute
 ```
 
 ### Safe Defaults
@@ -456,7 +472,7 @@ The authentication persistence flow is validated with deterministic in-memory st
 Run the validation with:
 
 ```text
-npm run test:auth-persistence
+npm test -- auth-persistence
 ```
 
 The frontend verification contract uses `GET /api/auth/session` with `Authorization: Bearer <access-token>`. The backend route and JWT authentication middleware are implemented and pass syntax validation. The deterministic persistence suite remains mock-based because live verification requires deployment-managed PostgreSQL and JWT configuration. The frontend does not use local JWT decoding as proof of authentication.
@@ -484,7 +500,7 @@ The production value above is a placeholder. A valid absolute HTTP or HTTPS URL 
 Validation commands:
 
 ```text
-npm run test:api-config
+npm test -- api-config
 VITE_API_BASE_URL=https://approved-production-api.example.com npm run build
 ```
 
@@ -492,8 +508,8 @@ Chat mock modes are disabled by default. Synthetic chat requires explicit local 
 
 ## Sprint 8 Validation
 
-Run `npm run test:sprint8-full` for the complete Sprint 8 targeted and affected regression suites. Production builds must disable every mock mode, use the approved HTTPS API origin, and restore generated `dist` assets after inspection. Detailed evidence is available in `docs/sprint8/sprint8-validation-report.md`.
+Run `npm test -- sprint8-full` for the complete Sprint 8 targeted and affected regression suites. Production builds must disable every mock mode, use the approved HTTPS API origin, and restore generated `dist` assets after inspection. Detailed evidence is available in `docs/sprint8/sprint8-validation-report.md`.
 
 ## Sprint 8 Administrator Workflows
 
-The administrator vehicle-listing wizard, dispatch board, and responsive sign-in experience are covered by `npm run test:sprint8-full` and `npm run test:login-interface`. Deployment requirements, blocked integration-owner dependencies, rollback guidance, and the reviewer summary are maintained under `docs/sprint8/`.
+The administrator vehicle-listing wizard, dispatch board, and responsive sign-in experience are covered by `npm test -- sprint8-full` and `npm test -- login-interface`. Deployment requirements, blocked integration-owner dependencies, rollback guidance, and the reviewer summary are maintained under `docs/sprint8/`.

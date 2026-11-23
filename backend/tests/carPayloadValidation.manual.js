@@ -1,5 +1,19 @@
 import { validateCarPayloadContract } from "../middleware/validateCarPayload.js";
 
+// Keep the fixture aligned with the current inventory contract so each
+// negative case isolates its intended invalid field.
+const requiredVehicleFields = {
+  vin: "1HGCM82633A004352",
+  make: "Toyota",
+  model: "Harrier",
+  color: "Silver",
+  condition: "Used",
+  status: "Available",
+  power: "150 hp",
+  engine: "2.0 L",
+  drive: "AWD",
+};
+
 const testCases = [
   {
     name: "valid payload with numeric price, mileage, and year",
@@ -132,7 +146,7 @@ const testCases = [
 let failed = 0;
 
 for (const testCase of testCases) {
-  const result = validateCarPayloadContract(testCase.payload);
+  const result = validateCarPayloadContract({ ...requiredVehicleFields, ...testCase.payload });
 
   const validMatches = result.valid === testCase.expectedValid;
   const errorMatches =
