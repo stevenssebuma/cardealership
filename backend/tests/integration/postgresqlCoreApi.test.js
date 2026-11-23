@@ -166,9 +166,15 @@ test('actual core API on native PostgreSQL', {
       assert.equal(matches.bookings[0].booking_date, day);
       await expect(409, 'PUT', `/admin/bookings/${first.id}/status`, admin, { status: 'confirmed' });
       await expect(200, 'PUT', `/admin/bookings/${second.id}/status`, admin, { status: 'confirmed' });
-      const bulk = await expect(200, 'PUT', '/admin/bookings/bulk', admin, { ids: [first.id, second.id], status: 'completed' });
-      assert.deepEqual(bulk.updatedIds.sort((a, b) => a - b), [first.id, second.id].sort((a, b) => a - b));
+      // Upstream policy: a cancelled booking can never be reopened.
+      await expect(409, 'PUT', '/admin/bookings/bulk', admin, { ids: [first.id, second.id], status: 'completed' });
+      const bulk = await expect(200, 'PUT', '/admin/bookings/bulk', admin, { ids: [second.id], status: 'completed' });
+      assert.deepEqual(bulk.updatedIds, [second.id]);
+      // Only pending vehicles may be rejected or approved through review actions.
+      await expect(409, 'PUT', `/admin/cars/${carId}/reject`, admin);
+      await client.query('UPDATE cars SET status = $1 WHERE id = $2', ['pending', carId]);
       assert.equal((await expect(200, 'PUT', `/admin/cars/${carId}/reject`, admin)).car.status, 'rejected');
+      await client.query('UPDATE cars SET status = $1 WHERE id = $2', ['pending', carId]);
       assert.equal((await expect(200, 'PUT', `/admin/cars/${carId}/approve`, admin)).car.is_available, true);
       const changed = (await expect(200, 'PUT', `/admin/cars/${carId}`, admin, { brand: 'Honda Updated' })).car;
       assert.equal(changed.make, 'Honda Updated');

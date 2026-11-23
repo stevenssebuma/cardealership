@@ -19,7 +19,7 @@ test('staging release smoke with real PostgreSQL and exact identity verification
   const revision='a'.repeat(40),deployment='s17-panda-staging-fixture';
   const env={...process.env,NODE_ENV:'staging',DATABASE_URL:url,STAGING_DATABASE_NAME:dbName,
     STAGING_DEPLOYMENT_ID:deployment,STAGING_SOURCE_REVISION:revision,
-    JWT_SECRET:'p7-synthetic-only-secret',EXCHANGE_RATE_PROVIDER:'disabled',CORS_ALLOWED_ORIGINS:'http://localhost:5173',TZ:'UTC'};
+    JWT_SECRET:'s17-local-staging-fixture-secret-2026-valid',EXCHANGE_RATE_PROVIDER:'disabled',CORS_ALLOWED_ORIGINS:'http://localhost:5173',TZ:'UTC'};
   delete env.TEST_DATABASE_URL;delete env.RENDER;
   const client=new pg.Client(buildPoolConfig(env));await client.connect();
   let child;
