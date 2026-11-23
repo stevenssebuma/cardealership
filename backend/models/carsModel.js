@@ -1,5 +1,6 @@
 import db from "../config/db.js";
 import { mapCarRow } from "../utils/databaseRows.js";
+import { canEditInventoryStatus } from "../utils/adminReviewPolicy.js";
 
 // GET ALL CARS
 
@@ -218,10 +219,13 @@ export const updateCar = async (id, data) => {
   );
 
   return db.withTransaction(async (tx) => {
-    const existing = await tx.query(`SELECT id FROM cars WHERE id = $1 FOR UPDATE;`, [id]);
+    const existing = await tx.query(`SELECT id, status FROM cars WHERE id = $1 FOR UPDATE;`, [id]);
 
     if (existing.rowCount === 0) {
       return null;
+    }
+    if (data.status !== undefined && !canEditInventoryStatus(existing.rows[0].status, data.status)) {
+      throw Object.assign(new Error('Invalid vehicle status transition'), { code: 'INVALID_STATUS_TRANSITION' });
     }
 
     if (carEntries.length > 0) {

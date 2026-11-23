@@ -15,7 +15,9 @@
     "db:admin": "node reset-admin.js",
     "db:migration:export": "node scripts/exportMigrationSnapshot.js",
     "db:migration:import": "node scripts/migrateLegacySnapshot.js",
-    "staging:smoke": "node scripts/stagingSmoke.js"
+    "staging:smoke": "node scripts/stagingSmoke.js",
+    "test": "node scripts/run-tests.js",
+    "test:car-image-cleanup": "node tests/carImageCleanup.manual.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

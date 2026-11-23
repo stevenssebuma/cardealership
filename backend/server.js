@@ -11,6 +11,7 @@ import cors from 'cors';
 import { buildPoolConfig } from './config/databasePoolConfig.js';
 import { closeDatabase } from './config/db.js';
 import { inspectDatabaseReadiness } from './config/databaseReadiness.js';
+import { resolveRuntimeSecurity } from './config/security.js';
 import { exchangeRateRefreshWorker } from './workers/exchangeRateRefreshWorker.js';
 
 
@@ -33,6 +34,16 @@ const allowedOrigins = process.env.CORS_ALLOWED_ORIGINS !== undefined
 try {
   buildPoolConfig();
   if (!process.env.JWT_SECRET?.trim()) throw new Error('AUTH_CONFIG_INVALID');
+  // Preserve Sprint 15 production secrets and exact HTTPS CORS requirements.
+  if (process.env.NODE_ENV === 'production') resolveRuntimeSecurity();
+  if (['production','staging'].includes(process.env.NODE_ENV) &&
+      (Buffer.byteLength(process.env.JWT_SECRET || '', 'utf8') < 32 ||
+       /^(replace|change|example|your[_-])/i.test(process.env.JWT_SECRET || ''))) {
+    throw new Error('AUTH_CONFIG_INVALID');
+  }
+  if (process.env.NODE_ENV === 'production' && !allowedOrigins.length) {
+    throw new Error('CORS_CONFIG_INVALID');
+  }
   for (const origin of allowedOrigins) {
     const url = new URL(origin);
     if (!['http:', 'https:'].includes(url.protocol) || url.origin !== origin) throw new Error('CORS_CONFIG_INVALID');

@@ -166,6 +166,7 @@ export async function editCar(req, res) {
       },
     });
   } catch (error) {
+    if (error.code === "INVALID_STATUS_TRANSITION") return sendError(res, 409, error.code, error.message);
     if (error.code === "23505") return sendError(res, 409, "CAR_CONFLICT", "Vehicle already exists.");
     console.error("Update car failed:", error.code || "DB_FAILURE");
 

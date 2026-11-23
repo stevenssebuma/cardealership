@@ -8,7 +8,7 @@ await runOperation(async () => {
   const password = process.env.ADMIN_PASSWORD;
   const name = process.env.ADMIN_NAME?.trim() || 'Staging Administrator';
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
-      typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password) > 72 || name.length > 160) {
+      typeof password !== 'string' || password.length < 14 || Buffer.byteLength(password) > 72 || name.length > 160) {
     throw operationError('ADMIN_CREDENTIALS_INVALID');
   }
   const hash = await bcrypt.hash(password, 12);

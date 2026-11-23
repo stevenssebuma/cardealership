@@ -1,6 +1,7 @@
 // backend/controllers/adminController.js
 import db from '../config/db.js';
 import { mapCarRow } from '../utils/databaseRows.js';
+import { allowedBookingSources, validRecordId, validateAdminCarUpdate, canEditInventoryStatus } from '../utils/adminReviewPolicy.js';
 
 const numericFields = (row, fields) => Object.fromEntries(
   Object.entries(row).map(([key, value]) => [key, fields.includes(key) ? Number(value ?? 0) : value])
@@ -267,23 +268,27 @@ export const getPendingApprovals = async (req, res) => {
 export const updateBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
-    const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
+    const status = req.body?.status;
+    const sources = allowedBookingSources(status);
+    if (!validRecordId(id) || !sources) {
+      return res.status(400).json({ success: false, message: 'Invalid booking ID or status' });
     }
     const result = await db.query(
       `UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $2 RETURNING *, booking_date::text AS booking_date`,
-      [status, id]
+       WHERE id = $2 AND status = ANY($3::text[])
+       RETURNING *, booking_date::text AS booking_date`,
+      [status, Number(id), sources]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Booking not found' });
+    if (!result.rowCount) {
+      const existing = await db.query('SELECT id FROM bookings WHERE id = $1', [Number(id)]);
+      return res.status(existing.rowCount ? 409 : 404).json({
+        success: false, message: existing.rowCount ? 'Invalid booking status transition' : 'Booking not found'
+      });
     }
     res.json({ success: true, booking: result.rows[0] });
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ success: false, message: 'This time slot is already booked' });
-    console.error('updateBookingStatus error:', error.message);
+    console.error('updateBookingStatus error:', error.code || 'ADMIN_FAILURE');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -293,23 +298,36 @@ export const updateBookingStatus = async (req, res) => {
 // ============================================
 export const bulkUpdateBookings = async (req, res) => {
   try {
-    const { ids, status } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ success: false, message: 'ids array required' });
+    const { ids, status } = req.body || {};
+    if (!Array.isArray(ids) || !ids.length || ids.length > 200 ||
+        ids.some(id => !validRecordId(id)) || new Set(ids.map(Number)).size !== ids.length) {
+      return res.status(400).json({ success: false, message: 'Invalid booking IDs' });
     }
-    const allowed = ['pending', 'confirmed', 'completed', 'cancelled'];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ success: false, message: 'Invalid status' });
-    }
-    const result = await db.query(
-      `UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ANY($2::int[]) RETURNING id`,
-      [status, ids]
-    );
-    res.json({ success: true, updatedIds: result.rows.map(r => r.id) });
+    const sources = allowedBookingSources(status);
+    if (!sources) return res.status(400).json({ success: false, message: 'Invalid status' });
+    const uniqueIds = ids.map(Number);
+    const updatedIds = await db.withTransaction(async tx => {
+      // Lock before validating; no partial status transitions can commit.
+      const locked = await tx.query(
+        'SELECT id, status FROM bookings WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE',
+        [uniqueIds]
+      );
+      if (locked.rowCount !== uniqueIds.length || locked.rows.some(row => !sources.includes(row.status))) return null;
+      const updated = await tx.query(
+        `UPDATE bookings SET status = $1, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ANY($2::int[]) AND status = ANY($3::text[]) RETURNING id`,
+        [status, uniqueIds, sources]
+      );
+      if (updated.rowCount !== uniqueIds.length) throw Object.assign(new Error('Bulk booking conflict'), { code: 'BULK_STATUS_CONFLICT' });
+      return updated.rows.map(row => row.id);
+    });
+    if (updatedIds === null) return res.status(409).json({ success: false, message: 'One or more bookings are missing or cannot transition; no bookings updated' });
+    res.json({ success: true, updatedIds });
   } catch (error) {
-    if (error.code === '23505') return res.status(409).json({ success: false, message: 'One or more time slots are already booked' });
-    console.error('bulkUpdateBookings error:', error.message);
+    if (error.code === '23505' || error.code === 'BULK_STATUS_CONFLICT') {
+      return res.status(409).json({ success: false, message: 'Booking status transition conflict' });
+    }
+    console.error('bulkUpdateBookings error:', error.code || 'ADMIN_FAILURE');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -320,16 +338,18 @@ export const bulkUpdateBookings = async (req, res) => {
 export const approveCar = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!validRecordId(id)) return res.status(400).json({ success: false, message: 'Invalid car ID' });
     const result = await db.query(
-      `UPDATE cars SET status = 'available', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
-      [id]
+      `UPDATE cars SET status = 'available', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND lower(status) = 'pending' RETURNING *`, [Number(id)]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Car not found' });
+    if (!result.rowCount) {
+      const existing = await db.query('SELECT id FROM cars WHERE id = $1', [Number(id)]);
+      return res.status(existing.rowCount ? 409 : 404).json({ success: false, message: existing.rowCount ? 'Only pending cars can be approved' : 'Car not found' });
     }
     res.json({ success: true, car: mapCarRow(result.rows[0]) });
   } catch (error) {
-    console.error('approveCar error:', error.message);
+    console.error('approveCar error:', error.code || 'ADMIN_FAILURE');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -340,16 +360,18 @@ export const approveCar = async (req, res) => {
 export const rejectCar = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!validRecordId(id)) return res.status(400).json({ success: false, message: 'Invalid car ID' });
     const result = await db.query(
-      `UPDATE cars SET status = 'rejected', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
-      [id]
+      `UPDATE cars SET status = 'rejected', updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND lower(status) = 'pending' RETURNING *`, [Number(id)]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Car not found' });
+    if (!result.rowCount) {
+      const existing = await db.query('SELECT id FROM cars WHERE id = $1', [Number(id)]);
+      return res.status(existing.rowCount ? 409 : 404).json({ success: false, message: existing.rowCount ? 'Only pending cars can be rejected' : 'Car not found' });
     }
     res.json({ success: true, car: mapCarRow(result.rows[0]) });
   } catch (error) {
-    console.error('rejectCar error:', error.message);
+    console.error('rejectCar error:', error.code || 'ADMIN_FAILURE');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
@@ -360,22 +382,33 @@ export const rejectCar = async (req, res) => {
 export const updateCar = async (req, res) => {
   try {
     const { id } = req.params;
+    const errors = validateAdminCarUpdate(req.body);
+    if (!validRecordId(id) || errors.length) {
+      return res.status(400).json({ success: false, message: 'Invalid vehicle update', errors });
+    }
     const { name, brand, price, year, status, description, image_url } = req.body;
-
-    const result = await db.query(
-      `UPDATE cars
-       SET name = COALESCE($1,name), brand = COALESCE($2,brand,make), make = COALESCE($2,make,brand),
-           price = COALESCE($3,price), year = COALESCE($4,year), status = COALESCE($5,status),
-           description = COALESCE($6,description), image_url = COALESCE($7,image_url),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $8
-       RETURNING *`,
-      [name, brand, price, year, status, description, image_url, id]
-    );
-    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Car not found' });
-    res.json({ success: true, car: mapCarRow(result.rows[0]) });
+    const outcome = await db.withTransaction(async tx => {
+      const current = await tx.query('SELECT id, status FROM cars WHERE id = $1 FOR UPDATE', [Number(id)]);
+      if (!current.rowCount) return { statusCode: 404, message: 'Car not found' };
+      if (status !== undefined && !canEditInventoryStatus(current.rows[0].status, status)) {
+        return { statusCode: 409, message: 'Invalid vehicle status transition' };
+      }
+      const updated = await tx.query(
+        `UPDATE cars
+         SET name = COALESCE($1,name), brand = COALESCE($2,brand,make), make = COALESCE($2,make,brand),
+             price = COALESCE($3,price), year = COALESCE($4,year), status = COALESCE($5,status),
+             description = COALESCE($6,description), image_url = COALESCE($7,image_url),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $8 RETURNING *`,
+        [name, brand, price, year, status, description, image_url, Number(id)]
+      );
+      return { statusCode: 200, car: mapCarRow(updated.rows[0]) };
+    });
+    if (outcome.statusCode !== 200) return res.status(outcome.statusCode).json({ success: false, message: outcome.message });
+    res.json({ success: true, car: outcome.car });
   } catch (error) {
-    console.error('updateCar error:', error.message);
+    if (error.code === '23505') return res.status(409).json({ success: false, message: 'Vehicle already exists' });
+    console.error('updateCar error:', error.code || 'ADMIN_FAILURE');
     res.status(500).json({ success: false, message: 'Server error' });
   }
 };
