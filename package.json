@@ -15,6 +15,7 @@
     "test:api-config": "tsx src/tests/apiConfig.manual.ts",
     "test:vehicle-filters": "tsx src/tests/vehicleFilterQuery.manual.ts",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
