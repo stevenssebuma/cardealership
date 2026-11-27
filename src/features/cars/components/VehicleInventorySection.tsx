@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Tabs,
   TabsContent,
@@ -33,6 +33,10 @@ interface VehicleInventorySectionProps {
   showHeader?: boolean;
 
   resetFilters?: () => void;
+  page?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
+  onTabChange?: (tab: InventoryTab) => void;
 }
 
 export function VehicleInventorySection({
@@ -42,49 +46,51 @@ export function VehicleInventorySection({
   sectionId = "inventory",
   showHeader = true,
   resetFilters,
+  page = 1,
+  pageSize = 9,
+  onPageChange,
+  onTabChange,
 }: VehicleInventorySectionProps) {
   const [currentTab, setCurrentTab] =
     useState<InventoryTab>("all");
+  const currentVehicles = filterByTab(currentTab);
+  const totalPages = Math.max(1, Math.ceil(currentVehicles.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const firstVehicle = currentVehicles.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastVehicle = Math.min(currentPage * pageSize, currentVehicles.length);
+
+  useEffect(() => {
+    if (onPageChange && page !== currentPage) {
+      onPageChange(currentPage);
+    }
+  }, [currentPage, onPageChange, page]);
+
+  function getPageVehicles(tab: InventoryTab) {
+    const tabVehicles = filterByTab(tab);
+    if (!onPageChange) return tabVehicles;
+
+    const tabPage = Math.min(page, Math.max(1, Math.ceil(tabVehicles.length / pageSize)));
+    const start = (tabPage - 1) * pageSize;
+    return tabVehicles.slice(start, start + pageSize);
+  }
 
   function EmptyInventoryState() {
     return (
-      <div
-        className="
-          flex
-          flex-col
-          items-center
-          justify-center
-          rounded-xl
-          border
-          bg-card
-          p-12
-          text-center
-          min-h-[350px]
-        "
-      >
-        <div
-          className="
-            rounded-full
-            bg-muted
-            p-5
-            mb-5
-          "
-        >
-          <SearchX size={45} />
+      <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/60 px-6 py-12 text-center">
+        <div className="mb-5 rounded-full bg-primary/10 p-4 text-primary">
+          <SearchX size={32} aria-hidden="true" />
         </div>
-
-        <h3 className="text-2xl font-bold mb-3">
-          No Cars Match Your Budget
+        <h3 className="mb-2 text-xl font-semibold">
+          No vehicles match these filters
         </h3>
-
-        <p className="max-w-md text-muted-foreground mb-6">
-          We could not find vehicles matching your current
-          search criteria. Try adjusting your budget or
-          resetting your filters.
+        <p className="mb-6 max-w-md text-sm leading-6 text-muted-foreground">
+          Try adjusting your search criteria or resetting your filters.
         </p>
 
         {resetFilters && (
           <Button
+            type="button"
+            variant="outline"
             onClick={() => {
               resetFilters();
               setCurrentTab("all");
@@ -101,9 +107,9 @@ export function VehicleInventorySection({
     return (
       <section
         id={sectionId}
-        className="py-24 px-6 lg:px-8"
+        className={showHeader ? "px-4 py-20 sm:px-6 lg:px-8" : "p-0"}
       >
-        <div className="max-w-7xl mx-auto">
+        <div className="mx-auto max-w-7xl">
           {showHeader && (
             <div className="text-center mb-16">
               <h3
@@ -132,9 +138,9 @@ export function VehicleInventorySection({
   return (
     <section
       id={sectionId}
-      className="py-24 px-6 lg:px-8"
+      className={showHeader ? "px-4 py-20 sm:px-6 lg:px-8" : "p-0"}
     >
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto max-w-7xl">
         {showHeader && (
           <div className="text-center mb-16">
             <h3
@@ -158,62 +164,38 @@ export function VehicleInventorySection({
 
         <Tabs
           value={currentTab}
-          onValueChange={(value) =>
-            setCurrentTab(value as InventoryTab)
-          }
+          onValueChange={(value) => {
+            const tab = value as InventoryTab;
+            setCurrentTab(tab);
+            onTabChange?.(tab);
+          }}
           className="w-full"
         >
-          <TabsList
-            className="
-              grid
-              w-full
-              max-w-md
-              mx-auto
-              grid-cols-4
-              mb-12
-              h-12
-            "
-          >
+          <TabsList className="mb-6 grid h-11 w-full max-w-lg grid-cols-4 rounded-lg border border-border bg-card p-1">
             <TabsTrigger
               value="all"
-              className="
-                font-semibold
-                data-[state=active]:bg-primary
-                data-[state=active]:text-white
-              "
+              className="rounded-md text-xs font-semibold tracking-wide data-[state=active]:bg-primary/15 data-[state=active]:text-primary sm:text-sm"
             >
               ALL
             </TabsTrigger>
 
             <TabsTrigger
               value="luxury"
-              className="
-                font-semibold
-                data-[state=active]:bg-primary
-                data-[state=active]:text-white
-              "
+              className="rounded-md text-xs font-semibold tracking-wide data-[state=active]:bg-primary/15 data-[state=active]:text-primary sm:text-sm"
             >
               LUXURY
             </TabsTrigger>
 
             <TabsTrigger
               value="sport"
-              className="
-                font-semibold
-                data-[state=active]:bg-primary
-                data-[state=active]:text-white
-              "
+              className="rounded-md text-xs font-semibold tracking-wide data-[state=active]:bg-primary/15 data-[state=active]:text-primary sm:text-sm"
             >
               SPORT
             </TabsTrigger>
 
             <TabsTrigger
               value="4x4"
-              className="
-                font-semibold
-                data-[state=active]:bg-primary
-                data-[state=active]:text-white
-              "
+              className="rounded-md text-xs font-semibold tracking-wide data-[state=active]:bg-primary/15 data-[state=active]:text-primary sm:text-sm"
             >
               4X4
             </TabsTrigger>
@@ -235,15 +217,9 @@ export function VehicleInventorySection({
                 <EmptyInventoryState />
               ) : (
                 <div
-                  className="
-                    grid
-                    grid-cols-1
-                    md:grid-cols-2
-                    lg:grid-cols-3
-                    gap-8
-                  "
+                  className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3 xl:gap-6"
                 >
-                  {filterByTab(tab).map((vehicle) => (
+                  {getPageVehicles(tab).map((vehicle) => (
                     <VehicleCard
                       key={vehicle.id}
                       vehicle={vehicle}
@@ -254,6 +230,39 @@ export function VehicleInventorySection({
             </TabsContent>
           ))}
         </Tabs>
+        {onPageChange && currentVehicles.length > 0 && (
+          <div className="mt-8 flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              Showing {firstVehicle}–{lastVehicle} of {currentVehicles.length}
+            </p>
+            {totalPages > 1 && (
+              <nav
+                className="flex items-center gap-3"
+                aria-label="Vehicle inventory pages"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={currentPage <= 1}
+                  onClick={() => onPageChange(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="min-w-20 text-center text-sm" aria-current="page">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => onPageChange(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </nav>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

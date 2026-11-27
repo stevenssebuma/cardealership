@@ -155,7 +155,7 @@ function BookingGroup({
   );
 }
 
-export function BookingHistory() {
+export function BookingHistory({ showTitle = true }: { showTitle?: boolean } = {}) {
   const {
     isLoading,
     result,
@@ -247,17 +247,21 @@ export function BookingHistory() {
 
   return (
     <Card className="profile-settings-wide">
-      <CardHeader>
-        <CardTitle className="booking-title">
-          <CalendarClock size={22} aria-hidden="true" />
-          Test-drive history
-        </CardTitle>
-        {result.mock && (
-          <p className="booking-mock">
-            Synthetic development booking data is displayed.
-          </p>
-        )}
-      </CardHeader>
+      {(showTitle || result.mock) && (
+        <CardHeader>
+          {showTitle && (
+            <CardTitle className="booking-title">
+              <CalendarClock size={22} aria-hidden="true" />
+              Test-drive history
+            </CardTitle>
+          )}
+          {result.mock && (
+            <p className="booking-mock">
+              Synthetic development booking data is displayed.
+            </p>
+          )}
+        </CardHeader>
+      )}
       <CardContent>
         {(cancelNotice || cancelError) && (
           <div className="booking-feedback">

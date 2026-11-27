@@ -47,6 +47,9 @@ export default app;
 
 // Define the port
 const PORT = process.env.PORT || 5000;
+const HOST =
+    process.env.HOST ||
+    (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 
 // ============================================
 // MIDDLEWARE
@@ -68,6 +71,8 @@ app.use(helmet());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
     process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -697,11 +702,11 @@ function logSignInPolicy() {
 // ============================================
 
 // Keep a reference to the HTTP server so automated tests can close it.
-export const httpServer = app.listen(PORT, async () => {
+export const httpServer = app.listen(PORT, HOST, async () => {
     console.log("========================================");
     console.log("Panda Motors API Server");
     console.log("========================================");
-    console.log(`Server running on: http://localhost:${PORT}`);
+    console.log(`Server running on: http://${HOST}:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
 
     // Initialize database

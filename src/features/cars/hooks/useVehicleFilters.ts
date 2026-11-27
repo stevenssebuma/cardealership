@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { buildVehicleFilterQuery, parseVehicleFilterQuery } from "../utils/filterQuery";
+import {
+  buildVehicleFilterQuery,
+  parseVehicleFilterQuery,
+  updateVehicleFilterQuery,
+} from "../utils/filterQuery";
+import type { VehicleSortOrder } from "../utils/filterQuery";
 import type { InventoryTab, Vehicle } from "../types";
 
 export function useVehicleFilters(vehicles: Vehicle[]) {
@@ -11,12 +16,13 @@ export function useVehicleFilters(vehicles: Vehicle[]) {
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const updateFilters = (next: Partial<typeof queryFilters>) => {
-    setSearchParams(buildVehicleFilterQuery({ ...queryFilters, ...next }), { replace: true });
+  const updateFilters = (changes: Partial<typeof queryFilters>) => {
+    const nextFilters = updateVehicleFilterQuery(queryFilters, changes);
+    setSearchParams(buildVehicleFilterQuery(nextFilters), { replace: true });
   };
 
   const filteredVehicles = useMemo(() => {
-    return vehicles.filter((vehicle) => {
+    const matchesFilters = vehicles.filter((vehicle) => {
       const matchesBrand = queryFilters.brand
         ? `${vehicle.make} ${vehicle.name}`
             .toLowerCase()
@@ -26,6 +32,13 @@ export function useVehicleFilters(vehicles: Vehicle[]) {
         ? vehicle.year.toString().includes(queryFilters.year)
         : true;
       return matchesBrand && matchesYear && vehicle.price <= queryFilters.maxPrice;
+    });
+
+    return matchesFilters.sort((left, right) => {
+      if (queryFilters.sort === "price-asc") return left.price - right.price;
+      if (queryFilters.sort === "price-desc") return right.price - left.price;
+      if (queryFilters.sort === "year-desc") return right.year - left.year;
+      return 0;
     });
   }, [vehicles, queryFilters]);
 
@@ -49,6 +62,10 @@ export function useVehicleFilters(vehicles: Vehicle[]) {
     setSearchBrand: (value: string) => updateFilters({ brand: value }),
     searchYear: queryFilters.year,
     setSearchYear: (value: string) => updateFilters({ year: value }),
+    sort: queryFilters.sort,
+    setSort: (value: VehicleSortOrder) => updateFilters({ sort: value }),
+    page: queryFilters.page,
+    setPage: (value: number) => updateFilters({ page: value }),
     filteredVehicles,
     resetFilters,
     filterByTab,

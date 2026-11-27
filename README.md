@@ -33,6 +33,9 @@
   npm start                # API on http://localhost:5500
   ```
 
+  The backend binds to `127.0.0.1` in development. Set `HOST` to override it;
+  production defaults to `0.0.0.0`.
+
   TLS is decided from the connection string: managed hosts get SSL automatically and
   localhost runs without it. Use `DATABASE_SSL=true` to force SSL on, or
   `sslmode=require` in the URL. `GET /api/cars` serves the inventory.

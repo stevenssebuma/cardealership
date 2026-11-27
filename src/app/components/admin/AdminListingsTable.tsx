@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { MOCK_VEHICLES } from "@/features/cars/data/mockVehicles";
 import { formatUGX } from "@/features/cars/utils/formatUGX";
 // One shared vehicle shape: this table used to declare its own narrower copy,
 // which made an `AdminVehicle[]` from src/types/vehicle unusable as its props.
@@ -23,12 +22,7 @@ type AdminListingsTableProps = {
   vehicles?: AdminVehicle[];
 };
 
-const DEFAULT_VEHICLES: AdminVehicle[] = MOCK_VEHICLES.map((vehicle) => ({
-  ...vehicle,
-  condition: vehicle.condition ?? "New",
-  status: (vehicle.status === "Available" || vehicle.status === "Sold" ? vehicle.status : "Available") as VehicleStatus,
-  image: vehicle.image ?? "",
-}));
+const EMPTY_VEHICLES: AdminVehicle[] = [];
 
 function getVehicleStatus(vehicle: AdminVehicle): VehicleStatus {
   if (vehicle.status) {
@@ -58,7 +52,7 @@ function getStatusBadgeClass(status: VehicleStatus) {
   return "bg-muted text-muted-foreground hover:bg-muted";
 }
 
-export function AdminListingsTable({ vehicles = DEFAULT_VEHICLES }: AdminListingsTableProps) {
+export function AdminListingsTable({ vehicles = EMPTY_VEHICLES }: AdminListingsTableProps) {
   const [listings, setListings] = useState<AdminVehicle[]>(vehicles);
   const [vehicleToDelete, setVehicleToDelete] = useState<AdminVehicle | null>(null);
 

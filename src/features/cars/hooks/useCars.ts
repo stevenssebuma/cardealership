@@ -6,6 +6,7 @@ export function useCars() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,7 +35,12 @@ export function useCars() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
-  return { vehicles, loading, error };
+  return {
+    vehicles,
+    loading,
+    error,
+    retry: () => setReloadKey((current) => current + 1),
+  };
 }

@@ -1,4 +1,5 @@
 export { VehicleCard } from "./VehicleCard";
+export { VehicleFilterSidebar } from "./VehicleFilterSidebar";
 export { VehicleInventorySection } from "./VehicleInventorySection";
 export { VehicleInventorySkeleton } from "./VehicleInventorySkeleton";
 export { VehicleSearchSection } from "./VehicleSearchSection";

@@ -11,105 +11,91 @@ interface VehicleCardProps {
 
 export function VehicleCard({ vehicle }: VehicleCardProps) {
   return (
-    <Card className="flex h-full w-full cursor-pointer flex-col overflow-hidden border-border bg-card transition-all duration-300 group hover:border-primary/50 hover:shadow-lg">
-      
-      {/* Image */}
-      <div className="relative h-52 sm:h-60 md:h-64 overflow-hidden">
+    <Card className="group flex h-full w-full flex-col overflow-hidden rounded-xl border-border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl hover:shadow-black/20">
+      <div className="relative h-52 overflow-hidden bg-muted sm:h-60">
         <img
           src={vehicle.image}
           alt={vehicle.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          loading="lazy"
+          className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(event) => {
-            const target = event.target as HTMLImageElement;
-            target.src =
+            const image = event.currentTarget;
+            image.onerror = null;
+            image.src =
               "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=800&q=80";
           }}
         />
-
-        {/* Brand */}
-        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 bg-black/70 backdrop-blur-sm text-white px-2.5 py-1 sm:px-3 text-[10px] sm:text-xs font-bold tracking-wide rounded-sm">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20"
+        />
+        <div className="absolute left-3 top-3 rounded-full border border-white/15 bg-black/65 px-3 py-1.5 text-xs font-semibold tracking-wide text-white backdrop-blur sm:left-4 sm:top-4">
           {vehicle.make}
         </div>
-
-        {/* Year + Condition */}
-        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex flex-col items-end gap-2">
-          <div className="bg-primary text-primary-foreground px-2.5 py-1 sm:px-3 text-[10px] sm:text-xs font-bold rounded-sm">
+        <div className="absolute right-3 top-3 flex items-center gap-2 sm:right-4 sm:top-4">
+          <span className="rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-sm">
             {vehicle.year}
-          </div>
-
-          <div
-            className={`px-2.5 py-1 sm:px-3 text-[10px] sm:text-xs font-bold rounded-sm ${
-              vehicle.condition === "Used"
-                ? "bg-orange-500 text-white"
-                : "bg-green-500 text-white"
-            }`}
-          >
+          </span>
+          <span className="rounded-full border border-white/20 bg-black/65 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur">
             {vehicle.condition}
-          </div>
+          </span>
         </div>
       </div>
 
-      {/* Content */}
-      <CardContent className="flex flex-1 flex-col p-4 sm:p-5 md:p-6">
-        
-        {/* Vehicle information */}
-        <div className="mb-4">
-          <p className="text-primary text-xs sm:text-sm font-semibold mb-1 tracking-wide">
+      <CardContent className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="mb-5">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
             {vehicle.type}
           </p>
-
-          <h4 className="text-xl sm:text-2xl font-bold mb-2 leading-tight">
-            {vehicle.name}
-          </h4>
-
-          <p className="text-2xl sm:text-3xl font-bold text-primary break-words">
+          <h3 className="mb-2 text-xl font-semibold leading-tight sm:text-2xl">
+            <Link
+              to={`/cars/${vehicle.id}`}
+              className="rounded-sm outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {vehicle.name}
+            </Link>
+          </h3>
+          <p className="text-2xl font-bold tracking-tight text-primary sm:text-3xl">
             {formatUGX(vehicle.price)}
           </p>
         </div>
 
-        {/* Specifications */}
-        <div className="mt-auto grid grid-cols-3 gap-2 border-t border-border pt-4 sm:gap-4">
-          
+        <dl className="mt-auto grid grid-cols-3 gap-3 border-t border-border pt-4 sm:gap-4">
           <div className="min-w-0">
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
-              POWER
-            </p>
-            <p className="text-xs sm:text-sm font-semibold truncate">
+            <dt className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+              Power
+            </dt>
+            <dd className="truncate text-xs font-semibold sm:text-sm">
               {vehicle.specs.power}
-            </p>
+            </dd>
           </div>
-
           <div className="min-w-0">
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
-              ENGINE
-            </p>
-            <p className="text-xs sm:text-sm font-semibold truncate">
+            <dt className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+              Engine
+            </dt>
+            <dd className="truncate text-xs font-semibold sm:text-sm">
               {vehicle.specs.engine}
-            </p>
+            </dd>
           </div>
-
           <div className="min-w-0">
-            <p className="text-[10px] sm:text-xs text-muted-foreground mb-1">
-              DRIVE
-            </p>
-            <p className="text-xs sm:text-sm font-semibold truncate">
+            <dt className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">
+              Drive
+            </dt>
+            <dd className="truncate text-xs font-semibold sm:text-sm">
               {vehicle.specs.drive}
-            </p>
+            </dd>
           </div>
+        </dl>
 
-        </div>
-
-        {/* Schedule test drive button */}
         <Button
           asChild
-          className="w-full mt-5 sm:mt-6 bg-primary hover:bg-primary/90 text-white font-semibold text-sm sm:text-base h-11 sm:h-12"
+          className="mt-6 h-11 w-full font-semibold"
         >
           <Link to={`/?vehicle=${vehicle.id}#test-drive`}>
-            SCHEDULE A TEST DRIVE
-            <ChevronRight className="ml-2" size={18} />
+            Schedule a test drive
+            <ChevronRight className="ml-2 size-4" aria-hidden="true" />
           </Link>
         </Button>
-
       </CardContent>
     </Card>
   );
